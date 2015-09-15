@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <title>Actual Reports</title>
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.css" rel="stylesheet">
+    <link href="css/bootstrap-theme.css" rel="stylesheet">
+
+    <link href="css/c3.min.css" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+    <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    <script src="js/jquery-1.11.2.min.js"></script>
+    <script src="js/handlebars-v3.0.3.js"></script>
+    <script src="js/d3.js"></script>
+    <script src="js/c3.min.js"></script>
+    <script src="js/cytoscape.min.js"></script>
+</head>
+<body>
+<table>
+    <tr>
+        <td>
+            <h4>Debug Info</h4>
+            <textarea id="debug_info"></textarea>
+
+            <hr/>
+            <button id="generate" class="btn btn-default" onclick="$(this).trigger('generate')">generate
+            <span class="input-group-btn">
+        <button id="clrBtn" class="btn btn-default" type="button" onclick="$(this).trigger('clear')">X</button>
+      </span>
+            </button>
+            <input id="fileInput" type="file" class="btn btn-default" onchange="$(this).trigger('readFile'); return false;" >
+            ReadFile </input>
+        </td>
+        <td width="100%">
+            <div id="chart"></div>
+        </td>
+    </tr>
+</table>
+
+<script>
+    var dtWeeklySale = [];
+    var dtWeeklyAveSale = [];
+    var vWeeklySale = [];
+    var vWeeklyAveSale = [];
+    var inputFileContent;
+
+    (function ($) {
+
+
+        $('#fileInput').off('readFile');
+        $('#fileInput').on('readFile', function (evt) {
+            var file = $("#fileInput").prop('files')[0];
+            var textType = /text.*/;
+            if (file.type.match(textType)) {
+                var reader = new FileReader();
+
+                reader.onload = function (e) {
+                    inputFileContent = reader.result;
+                }
+
+                reader.readAsText(file);
+            }
+            else {
+                alert("File not a text file")
+            }
+        });
+
+
+        function getData(data, nameOfDataSeries) {
+            if (!data) {
+                return "";
+            }
+            var dataSplit = data.split("%");
+            var fltrData;
+            $.each(dataSplit, function (idx, value) {
+                var len = value.indexOf(" ");
+                var currDataSeriesName = $.trim(value.substring(0, len));
+                if (currDataSeriesName === nameOfDataSeries) {
+                    fltrData = value.substring(len);
+                }
+            });
+
+            if (!fltrData) {
+                return "";
+            }
+            var timeSeries = [];
+            var dataSeries = [];
+            var dataSplit = fltrData.split(";");
+
+            for (var i in dataSplit) {
+                var record = dataSplit[i].split(":");
+                var date = record[0];
+                var value = record[1];
+                if (date && value) {
+                    timeSeries.push(date);
+                    dataSeries.push(value);
+                }
+            }
+            var retVal = {};
+            retVal.xValue = timeSeries;
+            retVal.yValue = dataSeries;
+            return retVal;
+        }
+
+        $("#clrBtn").off('clear');
+        $("#clrBtn").on('clear', function (evt) {
+            $("#debug_info").val("");
+            $('#generate').trigger('click');
+        });
+
+
+        $('#generate').on('generate', function (evt) {
+            var tmpdata = $("#debug_info").val();
+
+            if(inputFileContent){
+                tmpdata = inputFileContent;
+            }
+
+            var data = getData(tmpdata, "RcSalesActual");
+            dtRcSalesActual = [];
+            vRcSalesActual = [];
+            if (data) {
+                dtRcSalesActual = data.xValue;
+                vRcSalesActual = data.yValue;
+            }
+
+            data = getData(tmpdata, "RcAvgSalesActual");
+            dtRcAvgSalesActual = [];
+            vRcAvgSalesActual = [];
+            if (data) {
+                dtRcAvgSalesActual = data.xValue;
+                vRcAvgSalesActual = data.yValue;
+            }
+
+            var c3data = {
+                xs: {
+                    //Declare the axes
+                    'RcSalesActual': 'vRcSalesActual',
+                    'RcAvgSalesActual': 'vRcAvgSalesActual'
+                },
+                columns: [
+                    ['vWeeklySale'].concat(dtWeeklySale),
+                    ['vRcAvgSalesActual'].concat(dtRcAvgSalesActual),
+                    ['RcSalesActual'].concat(vRcSalesActual),
+                    ['RcAvgSalesActual'].concat(vWeeklyAveSale)
+                ],
+                types: {
+                    vWeeklyAveSale: 'line'
+                }
+            };
+            var chart = c3.generate({
+                data: c3data,
+                zoom: {
+                    enabled: true
+                },
+                point: {
+                    show: true
+                }/*,
+
+                 axis: {
+                 x: {
+                 type: 'timeseries'/!*,
+                 tick: {
+                 format: function (x) {
+                 return x.toISOString().slice(0, 10);
+                 }
+                 //format: '%Y' // format string is also available for timeseries data
+                 }*!/
+                 }
+                 }*/
+            });
+        });
+    })(jQuery);
+
+</script>
+</body>
+</html>
