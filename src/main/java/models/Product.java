@@ -603,13 +603,13 @@ public class Product {
 
     private String salesToString(){
         StringBuffer rcSalesBf = new StringBuffer();
-        rcSalesBf.append("rcSales ");
+        rcSalesBf.append("rcSales|");
         StringBuffer rcAvgSalesBf = new StringBuffer();
-        rcAvgSalesBf.append("rcAvgSales ");
+        rcAvgSalesBf.append("rcAvgSales|");
         StringBuffer rcSalesActualBf = new StringBuffer();
-        rcSalesActualBf.append("rcSalesActual ");
+        rcSalesActualBf.append("rcSalesActual|");
         StringBuffer rcAvgSalesActualBf = new StringBuffer();
-        rcAvgSalesActualBf.append("rcAvgSalesActual ");
+        rcAvgSalesActualBf.append("rcAvgSalesActual|");
 
         Iterator<Years> yrItr = salesMap.keySet().iterator();
         Map<LocalDate, Sales> currSalesMap;
@@ -626,31 +626,31 @@ public class Product {
                 currSale = currSalesMap.get(currDate);
                 //rc sales actual
                 rcSalesActualBf.append(currDate);
-                rcSalesActualBf.append(": ");
+                rcSalesActualBf.append(":");
                 rcSalesActualBf.append(currSale.getRcSalesActual());
-                rcSalesActualBf.append(" ");
+                rcSalesActualBf.append("|");
                 //rc average sales actual
                 rcAvgSalesActualBf.append(currDate);
-                rcAvgSalesActualBf.append(": ");
+                rcAvgSalesActualBf.append(":");
                 rcAvgSalesActualBf.append(currSale.getRcAvgSalesActual());
-                rcAvgSalesActualBf.append(" ");
+                rcAvgSalesActualBf.append("|");
                 //rc sales
                 rcSalesBf.append(currDate);
-                rcSalesBf.append(": ");
+                rcSalesBf.append(":");
                 rcSalesBf.append(currSale.getRcSales());
-                rcSalesBf.append(" ");
+                rcSalesBf.append("|");
                 //rc sales average
                 rcAvgSalesBf.append(currDate);
-                rcAvgSalesBf.append(": ");
+                rcAvgSalesBf.append(":");
                 rcAvgSalesBf.append(currSale.getRcAvgSales());
-                rcAvgSalesBf.append(" ");
+                rcAvgSalesBf.append("|");
 
             }
         }
-        rcSalesActualBf.append("\n");
-        rcAvgSalesActualBf.append("\n");
-        rcSalesBf.append("\n");
-        rcAvgSalesBf.append("\n");
+        rcSalesActualBf.append(";\n");
+        rcAvgSalesActualBf.append(";\n");
+        rcSalesBf.append(";\n");
+        rcAvgSalesBf.append(";\n");
 
         StringBuffer retBf = new StringBuffer();
         retBf.append(rcSalesActualBf.toString());
@@ -670,13 +670,13 @@ public class Product {
         Demand currDemand;
 
         StringBuffer rcActualDemandBf = new StringBuffer();
-        rcActualDemandBf.append("rcActualDemand ");
+        rcActualDemandBf.append("rcActualDemand|");
         StringBuffer rcDemandBf = new StringBuffer();
-        rcDemandBf.append("rcDemand ");
+        rcDemandBf.append("rcDemand|");
         StringBuffer rcAvgDemandBf = new StringBuffer();
-        rcAvgDemandBf.append("rcAvgDemand ");
+        rcAvgDemandBf.append("rcAvgDemand|");
         StringBuffer rcAvgDemandActualBf = new StringBuffer();
-        rcAvgDemandActualBf.append("rcAvgDemandActual ");
+        rcAvgDemandActualBf.append("rcAvgDemandActual|");
 
 
         while(yrItr.hasNext()){
@@ -688,30 +688,30 @@ public class Product {
                 currDemand = currDemandMap.get(currDate);
                 //actual demand
                 rcActualDemandBf.append(currDate);
-                rcActualDemandBf.append(": ");
+                rcActualDemandBf.append(":");
                 rcActualDemandBf.append(currDemand.getRcDemandActual());
-                rcActualDemandBf.append(" ");
+                rcActualDemandBf.append("|");
                 //rc demand
                 rcDemandBf.append(currDate);
-                rcDemandBf.append(": ");
+                rcDemandBf.append(":");
                 rcDemandBf.append(currDemand.getRcDemand());
-                rcDemandBf.append(" ");
+                rcDemandBf.append("|");
                 //rc average demand
                 rcAvgDemandBf.append(currDate);
-                rcAvgDemandBf.append(": ");
+                rcAvgDemandBf.append(":");
                 rcAvgDemandBf.append(currDemand.getRcAvgDemand());
-                rcAvgDemandBf.append(" ");
+                rcAvgDemandBf.append("|");
                 //rc average demand actual
                 rcAvgDemandActualBf.append(currDate);
-                rcAvgDemandActualBf.append(": ");
+                rcAvgDemandActualBf.append(":");
                 rcAvgDemandActualBf.append(currDemand.getRcAvgDemandActual());
-                rcAvgDemandActualBf.append(" ");
+                rcAvgDemandActualBf.append("|");
             }
         }
-        rcActualDemandBf.append("\n");
-        rcDemandBf.append("\n");
-        rcAvgDemandBf.append("\n");
-        rcAvgDemandActualBf.append("\n");
+        rcActualDemandBf.append(";\n");
+        rcDemandBf.append(";\n");
+        rcAvgDemandBf.append(";\n");
+        rcAvgDemandActualBf.append(";\n");
 
         StringBuffer retBf = new StringBuffer();
         retBf.append(rcActualDemandBf.toString());

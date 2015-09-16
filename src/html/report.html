@@ -48,10 +48,18 @@
 </table>
 
 <script>
-    var dtWeeklySale = [];
-    var dtWeeklyAveSale = [];
-    var vWeeklySale = [];
-    var vWeeklyAveSale = [];
+    var dtRcSalesActual = [];
+    var vRcAvgSalesActual = [];
+
+    var vRcSalesActual = [];
+    var dtRcAvgSalesActual = [];
+
+    var vRcSales = [];
+    var dtRcSales = [];
+
+    var vRcAvgSales = [];
+    var dtRcAvgSales = [];
+
     var inputFileContent;
 
     (function ($) {
@@ -80,12 +88,12 @@
             if (!data) {
                 return "";
             }
-            var dataSplit = data.split("%");
+            var dataSplit = data.split(";");
             var fltrData;
             $.each(dataSplit, function (idx, value) {
-                var len = value.indexOf(" ");
+                var len = value.indexOf("|");
                 var currDataSeriesName = $.trim(value.substring(0, len));
-                if (currDataSeriesName === nameOfDataSeries) {
+                if (currDataSeriesName.toLowerCase() === nameOfDataSeries.toLowerCase()) {
                     fltrData = value.substring(len);
                 }
             });
@@ -95,7 +103,7 @@
             }
             var timeSeries = [];
             var dataSeries = [];
-            var dataSplit = fltrData.split(";");
+            var dataSplit = fltrData.split("|");
 
             for (var i in dataSplit) {
                 var record = dataSplit[i].split(":");
@@ -142,20 +150,43 @@
                 vRcAvgSalesActual = data.yValue;
             }
 
+            data = getData(tmpdata, "RcSales");
+            dtRcSales = [];
+            vRcSales = [];
+            if (data) {
+                dtRcSales = data.xValue;
+                vRcSales = data.yValue;
+            }
+
+            data = getData(tmpdata, "RcAvgSales");
+            dtRcAvgSales = [];
+            vRcAvgSales = [];
+            if (data) {
+                dtRcAvgSales = data.xValue;
+                vRcAvgSales = data.yValue;
+            }
+
             var c3data = {
                 xs: {
                     //Declare the axes
                     'RcSalesActual': 'vRcSalesActual',
-                    'RcAvgSalesActual': 'vRcAvgSalesActual'
+                    'RcAvgSalesActual': 'vRcAvgSalesActual',
+                    'RcSales': 'vRcSales',
+                    'RcAvgSales': 'vRcAvgSales'
                 },
                 columns: [
-                    ['vWeeklySale'].concat(dtWeeklySale),
+                    ['vRcSalesActual'].concat(dtRcSalesActual),
                     ['vRcAvgSalesActual'].concat(dtRcAvgSalesActual),
+                    ['vRcSales'].concat(dtRcSales),
+                    ['vRcAvgSales'].concat(dtRcAvgSales),
                     ['RcSalesActual'].concat(vRcSalesActual),
-                    ['RcAvgSalesActual'].concat(vWeeklyAveSale)
+                    ['RcAvgSalesActual'].concat(vRcAvgSalesActual),
+                    ['RcSales'].concat(vRcSales),
+                    ['RcAvgSales'].concat(vRcAvgSales)
                 ],
-                types: {
-                    vWeeklyAveSale: 'line'
+                types:{
+                    RcAvgSales:'bar',
+                    RcAvgSalesActual:'bar'
                 }
             };
             var chart = c3.generate({
@@ -165,19 +196,19 @@
                 },
                 point: {
                     show: true
-                }/*,
+                },
 
-                 axis: {
-                 x: {
-                 type: 'timeseries'/!*,
-                 tick: {
-                 format: function (x) {
-                 return x.toISOString().slice(0, 10);
-                 }
-                 //format: '%Y' // format string is also available for timeseries data
-                 }*!/
-                 }
-                 }*/
+                axis: {
+                    x: {
+                        type: 'timeseries',
+                        tick: {
+                            format: function (x) {
+                                return x.toISOString().slice(0, 10);
+                            }
+                            //format: '%Y' // format string is also available for timeseries data
+                        }
+                    }
+                }
             });
         });
     })(jQuery);

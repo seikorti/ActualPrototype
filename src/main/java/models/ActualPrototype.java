@@ -66,7 +66,7 @@ public class ActualPrototype {
 
         Random randGen = new Random();
         LocalDate strtDt = SystemDao.getCrc();
-        LocalDate endDt = SystemDao.getCrc().plusWeeks(6);
+        LocalDate endDt = SystemDao.getCrc().plusWeeks(8);
         Location loc1;
         Product product = null;
         while(!strtDt.isAfter(endDt)){
