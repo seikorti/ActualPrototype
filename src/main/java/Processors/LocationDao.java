@@ -33,4 +33,8 @@ public class LocationDao {
         return  instance;
     }
 
+    public Collection<Location> getLocations(){
+        return locationMap.values();
+    }
+
 }

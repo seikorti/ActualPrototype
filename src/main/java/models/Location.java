@@ -1,5 +1,6 @@
 package models;
 
+import Processors.ProcessingHook;
 import org.joda.time.LocalDate;
 
 import java.util.*;
@@ -33,6 +34,10 @@ public class Location {
         this.id = id;
     }
 
+    public Collection<Product> getProducts(){
+        return productMap.values();
+    }
+
     public void processSale(Product prod, Integer qty){
         if(productMap.get(prod.getId()) == null){
             productMap.put(prod.getId(), prod);
@@ -50,10 +55,10 @@ public class Location {
     }
 
     public void processDailyMetrics(){
-        Collection<Product> products = productMap.values();
+        /*Collection<Product> products = productMap.values();
         for(Product p : products){
             p.processDailyMetrics();
-        }
+        }*/
     }
 
 }

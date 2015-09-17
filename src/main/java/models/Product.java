@@ -3,6 +3,10 @@ package models;
 import org.joda.time.*;
 import util.SystemDao;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -33,7 +37,7 @@ public class Product {
 
     //RC Accumulators
     double rcAvgSales;
-    double rcSales;
+    double totalSales;
     double rcSalesActual;
 
     double rcDemand;
@@ -62,11 +66,12 @@ public class Product {
     private boolean onRange;
     private boolean hasSale;
     double rcLostUnits;
-    private double epSales;
     private boolean hasBeenOffRange;
     private boolean learningMetricsInitialized;
     private boolean highSeasonality;
     private double rcAvgSalesActual;
+    private double actualSales;
+
 
 
     public enum STATUS_CD {
@@ -75,15 +80,85 @@ public class Product {
 
     public Product(String id){
         this.id = id;
+    }
+
+
+    public void performDailyMetricsProcessing(String locationId) {
+        System.out.println("Starting Daily Metrics Processing for product/location: " + locationId);
+            processDailyMetrics();
+    }
+
+    //Hook: WeeklyLearningSummationHook.java
+    public void performWeeklyMetricsProcessing(String locationId) {
+        System.out.println("Starting the Weekly Metrics Processing for product/location: " + locationId);
+        if(SystemDao.getCrc().getDayOfWeek() == DateTimeConstants.SATURDAY) {
+            processWeeklyMetrics();
+
+        }
+
+    }
+
+    public void peformDemandLearning(String locationId) {
+        System.out.println("Starting the Demand Learning for product/location: " + locationId);
+        initLearningMetrics();
+        performDailyLearning();
+    }
+
+    //Hook: MSSalesOutlierCheckHook.java
+    public void performOutlierProcessing(String locId) {
+        // only apply constraint if we are not in a seasonal period
+        System.out.println("Starting the Outlier/Unreported Sales Calculation for product/location: " + locId);
+
+        double unreportedSales = 1.0;//calculator.getUnreportedSalesUnits();
+
+        int specialPuchaseOrderWassMult = SystemDao.getSpecialPurchaseOrderWassMultiplier();
+        int specialPuchaseOrderSizeMult = SystemDao.getSpecialPurchaseOrderSizeMultipler();
+        double rcWass2 = Math.pow(rcAvgSales, 2);
+        Double maxValue = Math.max(rcAvgSales + specialPuchaseOrderSizeMult * Math.sqrt(Math.max(0, rcWass2)), specialPuchaseOrderWassMult * innerPackQty);
+        if(actualSales > maxValue && eventSeasonalIndicator == false){
+            actualSales = maxValue;
+        }
+        totalSales = actualSales + unreportedSales;
+    }
+
+    public void performPreprocessing(String locationId) {
+        System.out.println("Starting Pre-Processing for product/location: " + locationId);
         statusCd = STATUS_CD.NEW;
         isBasicItem = true;
         learningMetricsInitialized = false;
         highSeasonality = false;
         eventSeasonalIndicator = false;
-        rcSales = 75; //assumes this is the average for similar product across departments in STG
+        totalSales = 75; //assumes this is the average for similar product across departments in STG
         innerPackQty = 10;
         syncInventory = false;
         onRange = true;
+    }
+
+    public void performPostProcessing(String locationId) {
+        System.out.println("Starting Post-Processing for product/location: " + locationId);
+        /*StringBuffer bf = new StringBuffer();
+        bf.append(this.toString());
+
+        System.out.println(bf.toString());
+
+        BufferedWriter output = null;
+        try {
+            File file = new File("./src/data/actualDemoData.txt");
+            output = new BufferedWriter(new FileWriter(file));
+            output.write(bf.toString());
+        } catch ( IOException e ) {
+            e.printStackTrace();
+        } finally {
+            if ( output != null ) try {
+                output.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }*/
+    }
+
+    public void performResetAndCounter(String locationId) {
+        System.out.println("Starting Reset And Counter Processing for product/location: " + locationId);
     }
 
     public String getId() {
@@ -142,20 +217,20 @@ public class Product {
         int specialPuchaseOrderSizeMult = SystemDao.getSpecialPurchaseOrderSizeMultipler();
         double rcWass2 = Math.pow(rcAvgSales, 2);
         Double maxValue = Math.max(rcAvgSales + specialPuchaseOrderSizeMult * Math.sqrt(Math.max(0, rcWass2)), specialPuchaseOrderWassMult * innerPackQty);
-        if(epSales > maxValue && eventSeasonalIndicator == false){
-            epSales = maxValue;
+        if(actualSales > maxValue && eventSeasonalIndicator == false){
+            actualSales = maxValue;
         }
-        return epSales;
+        return actualSales;
     }
 
 
-    protected void processSale(Integer numberSold){
+    protected void processSale(Integer sale){
         hasSale = true;
-        updateStatusCode();
-        epSales += numberSold;
-        inventory -= numberSold;
-        invOut += numberSold;
-        invIn -= numberSold;
+        //updateStatusCode();
+        actualSales += sale;
+        inventory -= sale;
+        invOut += sale;
+        invIn -= sale;
     }
 
     public Boolean getOnRange() {
@@ -174,7 +249,7 @@ public class Product {
     }
 
     public void setFirstSalesDate(LocalDate firstSalesDate) {
-        if(firstSalesDate == null && epSales > 0){
+        if(firstSalesDate == null && actualSales > 0){
             this.firstSalesDate = SystemDao.getCrc();
         }
         else {
@@ -292,6 +367,7 @@ public class Product {
         if (hasBeenOffRange) {
             hasBeenOffRange = false;
         }
+        resetWeeklyMatrics();
     }
 
     private void storeWeeklyMetrics(LocalDate crc){
@@ -329,6 +405,8 @@ public class Product {
         rcAvgSales = 0;
         rcAvgSalesActual = 0;
         rcWass2 = 0;
+        rcAvgDemand = 0;
+        rcAvgDemandActual = 0;
     }
 
 
@@ -359,7 +437,7 @@ public class Product {
         double defaultWeight = SystemDao.getDefaultWeight();
         double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
 
-        rcAvgSales = getWeightedWeight1(learningWeekCounter, defaultWeight) * rcSales/lastWeekLift +
+        rcAvgSales = getWeightedWeight1(learningWeekCounter, defaultWeight) * totalSales /lastWeekLift +
                 (1 - getWeightedWeight1(learningWeekCounter, defaultWeight))*rcAvgSales;
 
         //Tim's documentation states:
@@ -377,6 +455,7 @@ public class Product {
     }
 
     private void performDailyLearning() {
+        updateStatusCode();
         if (statusCd != STATUS_CD.LEARNING) {
             return;
         }
@@ -405,7 +484,7 @@ public class Product {
                 demandMap.put(currYr, currDemandMap);
             }
 
-            updateStatusCode();
+
 
         }
     }
@@ -414,8 +493,8 @@ public class Product {
         //assumes this product sells in eaches
         double demand = 0.0;
         double randNum = new Random().nextDouble(); // a random number between 0 and 1;
-        double lostSales = Math.max(0, rcSales - epSales);
-        double minDemand = epSales + Math.floor(lostSales);
+        double lostSales = Math.max(0, totalSales - actualSales);
+        double minDemand = actualSales + Math.floor(lostSales);
         if (randNum < (lostSales - Math.floor(lostSales))) {
             demand = minDemand + 1;
         } else {
@@ -425,30 +504,31 @@ public class Product {
     }
 
     private void resetEpAccumulators() {
-        rcSales = 0.0;
+        totalSales = 0.0;
+        actualSales = 0;
         rcSalesActual = 0.0;
         rcDemand = 0.0;
         rcDemandActual = 0.0;
         rcLostUnits = 0.0;
     }
 
-    public void processDailyMetrics(){
+    private void processDailyMetrics(){
         LocalDate crc = SystemDao.getCrc();
 
         //lostSales = max(0, averageSales - actualSales)
-        double lostSales = Math.max(0, rcSales - epSales);
+        double lostSales = Math.max(0, totalSales - actualSales);
 
         //outlier filtering done
-        rcSales += rcSales + getOutlierFilteredTotalSale();
+        //totalSales += totalSales + getOutlierFilteredTotalSale();
         Years yr = Years.years(crc.getYear());
 
-        rcSalesActual = rcSalesActual + epSales;
+        rcSalesActual = rcSalesActual + actualSales;
 
         //demand = sales + lostsales
         double demand = calculateEpDemand();
         rcDemand = rcDemand + demand;
 
-        double demandActual = epSales + lostSales;
+        double demandActual = actualSales + lostSales;
         rcDemandActual = rcDemandActual + demandActual;
 
         rcLostUnits = rcLostUnits + lostSales;
@@ -475,7 +555,7 @@ public class Product {
         if(s == null) {
             s = new Sales();
         }
-        s.setRcSales(rcSales);
+        s.setRcSales(totalSales);
         s.setRcSalesActual(rcSalesActual);
         s.setLostSales(rcLostUnits);
 
@@ -483,8 +563,8 @@ public class Product {
         salesMap.put(yr, currSalesMap);
 
         epAvgInv =  Math.max(0, (1 - getWeight1(5) * epAvgInv) + (getWeight1(5)*epEopInv));
-        if(rcSales > rcMaxSales){
-            rcMaxSales = rcSales;
+        if(totalSales > rcMaxSales){
+            rcMaxSales = totalSales;
             weekSinceMaxSales = 0;
         }
 
@@ -495,7 +575,7 @@ public class Product {
             daysSinceWalk = 0;
         }
 
-        if(epSales == 0){
+        if(actualSales == 0){
             daysSinceSale = daysSinceSale + 1;
         }
         else{
@@ -603,7 +683,7 @@ public class Product {
 
     private String salesToString(){
         StringBuffer rcSalesBf = new StringBuffer();
-        rcSalesBf.append("rcSales|");
+        rcSalesBf.append("totalSales|");
         StringBuffer rcAvgSalesBf = new StringBuffer();
         rcAvgSalesBf.append("rcAvgSales|");
         StringBuffer rcSalesActualBf = new StringBuffer();

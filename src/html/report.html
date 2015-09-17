@@ -54,8 +54,8 @@
     var vRcSalesActual = [];
     var dtRcAvgSalesActual = [];
 
-    var vRcSales = [];
-    var dtRcSales = [];
+    var vTotalSales = [];
+    var dtTotalSales = [];
 
     var vRcAvgSales = [];
     var dtRcAvgSales = [];
@@ -150,12 +150,12 @@
                 vRcAvgSalesActual = data.yValue;
             }
 
-            data = getData(tmpdata, "RcSales");
-            dtRcSales = [];
-            vRcSales = [];
+            data = getData(tmpdata, "TotalSales");
+            dtTotalSales = [];
+            vTotalSales = [];
             if (data) {
-                dtRcSales = data.xValue;
-                vRcSales = data.yValue;
+                dtTotalSales = data.xValue;
+                vTotalSales = data.yValue;
             }
 
             data = getData(tmpdata, "RcAvgSales");
@@ -171,17 +171,17 @@
                     //Declare the axes
                     'RcSalesActual': 'vRcSalesActual',
                     'RcAvgSalesActual': 'vRcAvgSalesActual',
-                    'RcSales': 'vRcSales',
+                    'TotalSales': 'vTotalSales',
                     'RcAvgSales': 'vRcAvgSales'
                 },
                 columns: [
                     ['vRcSalesActual'].concat(dtRcSalesActual),
                     ['vRcAvgSalesActual'].concat(dtRcAvgSalesActual),
-                    ['vRcSales'].concat(dtRcSales),
+                    ['vTotalSales'].concat(dtTotalSales),
                     ['vRcAvgSales'].concat(dtRcAvgSales),
                     ['RcSalesActual'].concat(vRcSalesActual),
                     ['RcAvgSalesActual'].concat(vRcAvgSalesActual),
-                    ['RcSales'].concat(vRcSales),
+                    ['TotalSales'].concat(vTotalSales),
                     ['RcAvgSales'].concat(vRcAvgSales)
                 ],
                 types:{

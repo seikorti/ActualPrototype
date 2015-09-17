@@ -1,6 +1,6 @@
 package models;
 
-import Processors.LocationDao;
+import Processors.*;
 import org.joda.time.LocalDate;
 import util.SystemDao;
 
@@ -27,8 +27,8 @@ import java.util.*;
 // 3. Calculate/set Derived Demand (only if we have high seasonality/lift)
 // 4. Setup DOW indices
 // 5. setupData() Evict objects we don't saved in the DB
-// 6. In status not NEW, Execute Preprocessing hooks "actualProductLocationProcessingWorkerPreProcessingHooks"
-// 7. Execute processing hooks (bean id: actualProcessingHooks)
+// 6. In status not NEW, execute Preprocessing hooks "actualProductLocationProcessingWorkerPreProcessingHooks"
+// 7. execute processing hooks (bean id: actualProcessingHooks)
 //actualSyncInventoryProcessingHook
 //actualResetDataAndCountersHook
 //updateDailyMetricsProcessingHook
@@ -51,10 +51,19 @@ import java.util.*;
 //update client metrics
 
 public class ActualPrototype {
+    List<ProcessingHook> processingHooks = new LinkedList<ProcessingHook>();
+    Collection<Location> locations =  LocationDao.getInstance().getLocations();
 
     public ActualPrototype(){
         LocalDate crc = new LocalDate().withYear(2013).withMonthOfYear(1).withDayOfMonth(1);
         SystemDao.setCrc(crc);
+        processingHooks.add(new PreProcessingHook());
+        processingHooks.add(new OutlierCheckProcessingHook());
+        processingHooks.add(new DemandLearningHook());
+        processingHooks.add(new UpdateDailyMetricsProcessingHook());
+        processingHooks.add(new UpdateWeeklyMetricsProcessingHook());
+        processingHooks.add(new PostProcessingHook());
+        processingHooks.add(new ResetDataAndCounterHook());
     }
 
     public static void main(String[] args){
@@ -69,17 +78,33 @@ public class ActualPrototype {
         LocalDate endDt = SystemDao.getCrc().plusWeeks(8);
         Location loc1;
         Product product = null;
+
         while(!strtDt.isAfter(endDt)){
             strtDt = strtDt.plusDays(1);
             loc1 = LocationDao.getInstance().getLocation("loc1");
             product = loc1.getProduct("prod1");
+
+            //perform a sale at this location
             int numberSold = randGen.nextInt(100);
             loc1.processSale(product, numberSold);
+
+            //now that the day is over run actual
+            actualPrototype.runActual();
+
             SystemDao.updateCrc();
         }
         System.out.println(product.toString());
         actualPrototype.saveData(new StringBuffer().append(product.toString()));
 
+    }
+
+    protected void runActual(){
+
+        for (Location loc : locations){
+            for(ProcessingHook hook : processingHooks){
+                hook.execute(loc);
+            }
+        }
     }
 
     public void setup(){
@@ -94,7 +119,7 @@ public class ActualPrototype {
 
         Location loc1 = LocationDao.getInstance().getLocation("loc1");
         loc1.addProduct(p1);
-        SystemDao.addLocation(loc1);
+        //SystemDao.addLocation(loc1);
     }
 
 

@@ -19,6 +19,7 @@ public class SystemDao {
     private static int specialPurchaseOrderSizeMultipler = 2;
 
 
+
     public static LocalDate getCrc() {
         return crc;
     }
@@ -43,21 +44,26 @@ public class SystemDao {
         SystemDao.defaultWeight = defaultWeight;
     }
 
-    public static LocalDate updateCrc(){
-
-
-        if(!crc.minusDays(1).isEqual(reviewCycleEndDate)) {
-            for (Location loc : locations) {
-                loc.processDailyMetrics();
-            }
+    public static boolean isEndOfRunCycle() {
+        if(crc.getDayOfWeek() == DateTimeConstants.SATURDAY){
+            return true;
         }
         else{
-            for (Location loc : locations) {
-                loc.processWeeklyMetrics();
-                reviewCycleEndDate = getReviewCycleEndDate();
-                reviewCycleStartDate = crc;
-            }
+            return  false;
         }
+    }
+
+    public static boolean isBeginOfRunCycle() {
+        if(crc.getDayOfWeek() == DateTimeConstants.SUNDAY){
+            return true;
+        }
+        else{
+            return  false;
+        }
+    }
+
+    public static LocalDate updateCrc(){
+
         crc = crc.plusDays(1);
         return crc;
     }
@@ -65,12 +71,14 @@ public class SystemDao {
 
 
     public static LocalDate getReviewCycleStartDate(){
-        return reviewCycleStartDate;
+        return crc.withDayOfWeek(DateTimeConstants.SUNDAY);
     }
 
+/*
     public static void addLocation(Location loc) {
         locations.add(loc);
     }
+*/
 
     public static int getSpecialPurchaseOrderWassMultiplier() {
         return specialPurchaseOrderWassMultiplier;
