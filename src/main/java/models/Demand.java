@@ -9,6 +9,7 @@ public class Demand {
     double rcOldAvgDemand;
     double rcDemand;
     double rcDemandActual;
+    double epDemand;
 
     public double getRcAvgDemand() {
         return rcAvgDemand;
@@ -48,5 +49,13 @@ public class Demand {
 
     public void setRcDemandActual(double rcDemandActual) {
         this.rcDemandActual = rcDemandActual;
+    }
+
+    public double getEpDemand() {
+        return epDemand;
+    }
+
+    public void setEpDemand(double epDemand) {
+        this.epDemand = epDemand;
     }
 }

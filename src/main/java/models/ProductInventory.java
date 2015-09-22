@@ -7,6 +7,7 @@ public class ProductInventory {
     double inStockPct;
     double epAvgInv;
     double epEopInv;
+    double bopInv;
 
     public double getInStockPct() {
         return inStockPct;
@@ -30,5 +31,13 @@ public class ProductInventory {
 
     public void setEpEopInv(double epEopInv) {
         this.epEopInv = epEopInv;
+    }
+
+    public double getBopInv() {
+        return bopInv;
+    }
+
+    public void setBopInv(double bopInv) {
+        this.bopInv = bopInv;
     }
 }

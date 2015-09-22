@@ -15,6 +15,7 @@ public class SystemDao {
     private static LocalDate reviewCycleStartDate = crc;
     private static LocalDate reviewCycleEndDate = getReviewCycleEndDate();
     private static double defaultWeight = 1.0;
+    //These values were obtained from qlauncher.properties
     private static int specialPurchaseOrderWassMultiplier = 3;
     private static int specialPurchaseOrderSizeMultipler = 2;
 

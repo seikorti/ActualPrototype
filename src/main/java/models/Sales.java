@@ -1,7 +1,5 @@
 package models;
 
-import com.sun.org.apache.bcel.internal.generic.NEW;
-
 /**
  * Created by skorti on 9/10/15.
  */
@@ -10,7 +8,8 @@ public class Sales {
     double rcAvgSalesActual;
     double rcSales;
     double rcSalesActual;
-    double totalSales;
+    double epSales;
+    double epSalesActual;
     double lostSales;
     double dailySalesScallingFactor;
 
@@ -30,12 +29,12 @@ public class Sales {
         this.rcAvgSalesActual = rcAvgSalesActual;
     }
 
-    public double getTotalSales() {
-        return totalSales;
+    public double getEpSales() {
+        return epSales;
     }
 
-    public void setTotalSales(double totalSales) {
-        this.totalSales = totalSales;
+    public void setEpSales(double epSales) {
+        this.epSales = epSales;
     }
 
     public double getRcSales() {
@@ -62,4 +61,11 @@ public class Sales {
         this.lostSales = lostSales;
     }
 
+    public double getEpSalesActual() {
+        return epSalesActual;
+    }
+
+    public void setEpSalesActual(double epSalesActual) {
+        this.epSalesActual = epSalesActual;
+    }
 }

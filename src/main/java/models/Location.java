@@ -48,10 +48,10 @@ public class Location {
     }
 
     public void processWeeklyMetrics(){
-        Collection<Product> products = productMap.values();
+/*        Collection<Product> products = productMap.values();
         for(Product p : products){
             p.processWeeklyMetrics();
-        }
+        }*/
     }
 
     public void processDailyMetrics(){

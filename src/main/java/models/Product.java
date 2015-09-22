@@ -3,10 +3,6 @@ package models;
 import org.joda.time.*;
 import util.SystemDao;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -37,7 +33,7 @@ public class Product {
 
     //RC Accumulators
     double rcAvgSales;
-    double totalSales;
+    double epSales;
     double rcSalesActual;
 
     double rcDemand;
@@ -65,13 +61,14 @@ public class Product {
     private boolean disableLearning;
     private boolean onRange;
     private boolean hasSale;
-    double rcLostUnits;
+    //double rcLostUnits;
     private boolean hasBeenOffRange;
     private boolean learningMetricsInitialized;
     private boolean highSeasonality;
     private double rcAvgSalesActual;
-    private double actualSales;
-
+    private double epSalesActual;
+    private double epDemand;
+    private double rcSales;
 
 
     public enum STATUS_CD {
@@ -80,26 +77,37 @@ public class Product {
 
     public Product(String id){
         this.id = id;
+        statusCd = STATUS_CD.NEW;
+        isBasicItem = true;
+        learningMetricsInitialized = false;
+        highSeasonality = false;
+        eventSeasonalIndicator = false;
+        epSales = 75; //assumes this is the average for similar product across departments in STG
+        innerPackQty = 10;
+        syncInventory = false;
+        onRange = true;
+        bopInv = 1000;
+        demoStock = 20;
+        rcSales = 0;
     }
 
 
     public void performDailyMetricsProcessing(String locationId) {
         System.out.println("Starting Daily Metrics Processing for product/location: " + locationId);
-            processDailyMetrics();
+        processDailyMetrics();
     }
 
     //Hook: WeeklyLearningSummationHook.java
     public void performWeeklyMetricsProcessing(String locationId) {
         System.out.println("Starting the Weekly Metrics Processing for product/location: " + locationId);
-        if(SystemDao.getCrc().getDayOfWeek() == DateTimeConstants.SATURDAY) {
+        if(SystemDao.getCrc().getDayOfWeek() == DateTimeConstants.SUNDAY) {
             processWeeklyMetrics();
 
         }
-
     }
 
     public void peformDemandLearning(String locationId) {
-        System.out.println("Starting the Demand Learning for product/location: " + locationId);
+        //System.out.println("Starting the Demand Learning for product/location: " + locationId);
         initLearningMetrics();
         performDailyLearning();
     }
@@ -109,56 +117,31 @@ public class Product {
         // only apply constraint if we are not in a seasonal period
         System.out.println("Starting the Outlier/Unreported Sales Calculation for product/location: " + locId);
 
-        double unreportedSales = 1.0;//calculator.getUnreportedSalesUnits();
-
         int specialPuchaseOrderWassMult = SystemDao.getSpecialPurchaseOrderWassMultiplier();
         int specialPuchaseOrderSizeMult = SystemDao.getSpecialPurchaseOrderSizeMultipler();
         double rcWass2 = Math.pow(rcAvgSales, 2);
         Double maxValue = Math.max(rcAvgSales + specialPuchaseOrderSizeMult * Math.sqrt(Math.max(0, rcWass2)), specialPuchaseOrderWassMult * innerPackQty);
-        if(actualSales > maxValue && eventSeasonalIndicator == false){
-            actualSales = maxValue;
+        if(epSalesActual > maxValue && eventSeasonalIndicator == false){
+            epSales = maxValue;
         }
-        totalSales = actualSales + unreportedSales;
+        else{
+            epSales = epSalesActual;
+        }
+
     }
 
     public void performPreprocessing(String locationId) {
         System.out.println("Starting Pre-Processing for product/location: " + locationId);
-        statusCd = STATUS_CD.NEW;
-        isBasicItem = true;
-        learningMetricsInitialized = false;
-        highSeasonality = false;
-        eventSeasonalIndicator = false;
-        totalSales = 75; //assumes this is the average for similar product across departments in STG
-        innerPackQty = 10;
-        syncInventory = false;
-        onRange = true;
+
     }
 
     public void performPostProcessing(String locationId) {
         System.out.println("Starting Post-Processing for product/location: " + locationId);
-        /*StringBuffer bf = new StringBuffer();
-        bf.append(this.toString());
 
-        System.out.println(bf.toString());
-
-        BufferedWriter output = null;
-        try {
-            File file = new File("./src/data/actualDemoData.txt");
-            output = new BufferedWriter(new FileWriter(file));
-            output.write(bf.toString());
-        } catch ( IOException e ) {
-            e.printStackTrace();
-        } finally {
-            if ( output != null ) try {
-                output.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }*/
     }
 
     public void performResetAndCounter(String locationId) {
-        System.out.println("Starting Reset And Counter Processing for product/location: " + locationId);
+       System.out.println("Starting Reset And Counter Processing for product/location: " + locationId);
     }
 
     public String getId() {
@@ -183,6 +166,14 @@ public class Product {
         }
     }
 
+    public int getDemoStock() {
+        return demoStock;
+    }
+
+    public void setDemoStock(int demoStock) {
+        this.demoStock = demoStock;
+    }
+
     public int getNumberOfDaysToBecomeActive() {
         return numberOfDaysToBecomeActive;
     }
@@ -204,30 +195,19 @@ public class Product {
     }
 
     public void setBopInv(int bopInv) {
-        this.bopInv = bopInv;
-        invIn = bopInv;
+        if(SystemDao.getCrc().getDayOfWeek() == DateTimeConstants.SUNDAY) {
+            this.bopInv = bopInv;
+        }
     }
 
     public void setInvIn(int invIn) {
         this.invIn = invIn;
     }
 
-    private Double getOutlierFilteredTotalSale(){
-        int specialPuchaseOrderWassMult = SystemDao.getSpecialPurchaseOrderWassMultiplier();
-        int specialPuchaseOrderSizeMult = SystemDao.getSpecialPurchaseOrderSizeMultipler();
-        double rcWass2 = Math.pow(rcAvgSales, 2);
-        Double maxValue = Math.max(rcAvgSales + specialPuchaseOrderSizeMult * Math.sqrt(Math.max(0, rcWass2)), specialPuchaseOrderWassMult * innerPackQty);
-        if(actualSales > maxValue && eventSeasonalIndicator == false){
-            actualSales = maxValue;
-        }
-        return actualSales;
-    }
-
 
     protected void processSale(Integer sale){
         hasSale = true;
-        //updateStatusCode();
-        actualSales += sale;
+        epSalesActual += sale;
         inventory -= sale;
         invOut += sale;
         invIn -= sale;
@@ -249,7 +229,7 @@ public class Product {
     }
 
     public void setFirstSalesDate(LocalDate firstSalesDate) {
-        if(firstSalesDate == null && actualSales > 0){
+        if(firstSalesDate == null && epSalesActual > 0){
             this.firstSalesDate = SystemDao.getCrc();
         }
         else {
@@ -311,57 +291,285 @@ public class Product {
     }
 
     private Sales getSales(LocalDate dt){
-        return salesMap.get(Years.years(dt.getYear())).get(dt);
+        return salesMap.get(Years.years(dt.getYear())) == null ? null : salesMap.get(Years.years(dt.getYear())).get(dt);
     }
 
-    private Demand getDemad(LocalDate dt){
-        return demandMap.get(Years.years(dt.getYear())).get(dt);
+    private Demand getDemand(LocalDate dt){
+        return demandMap.get(Years.years(dt.getYear())) == null ? null : demandMap.get(Years.years(dt.getYear())).get(dt);
     }
 
-    public void processWeeklyMetrics() {
+    public void setDisableLearning(Boolean disableLearning) {
+        //Learning can only be turned on on a SUNDAY
+        if(disableLearning) {
+            if (SystemDao.getCrc().plusDays(1).getDayOfWeek() == DateTimeConstants.SUNDAY)
+                this.disableLearning = disableLearning;
+        }
+        else{
+            this.disableLearning = disableLearning;
+        }
+    }
+
+    private double getDemandUplift(LocalDate dt){
+        Map<LocalDate, List<Event>> currEventMap = eventsMap.get(Years.years(dt.getYear()));
+        if(currEventMap == null){
+            return 1.0;
+        }
+        List<Event> events = currEventMap.get(dt);
+        return Event.calculateDemandUplift(events);
+    }
+
+    private void initLearningMetrics(){
+        if(learningMetricsInitialized){
+            return;
+        }
+        double defaultWeight = SystemDao.getDefaultWeight();
+        double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
+        Sales beginOfRunCycleSales = getSales(SystemDao.getReviewCycleStartDate());
+        double beginOfRunCycleRcAvgSales = 0;
+        if(beginOfRunCycleSales != null){
+            beginOfRunCycleRcAvgSales = beginOfRunCycleSales.getRcAvgSales();
+        }
+
+        rcAvgSales = getWeightedWeight1(learningWeekCounter, defaultWeight) * epSales/lastWeekLift +
+                (1 - getWeightedWeight1(learningWeekCounter, defaultWeight))*beginOfRunCycleRcAvgSales;
+
+        //Tim's documentation states:
+        //Its important sales metrics are initialized to AVG_WEEKLY_SALES based on the initialization logic.
+        //This estimates initial values based on different combinations of the PLs product and location
+        //hierarchies dependent on the specific situation for that PL
+        rcAvgSalesActual = rcAvgSales;
+        rcAvgDemand = rcAvgSales;
+        rcOldAvgDemand = rcAvgSales;
+        rcAvgDemandActual = rcAvgSales;
+        epAvgInv = rcAvgSales;
+
+        rcWass2 = Math.pow(rcAvgSales, 2);
+        learningMetricsInitialized = true;
+    }
+
+    private void performDailyLearning() {
+        updateStatusCode();
+        if (statusCd != STATUS_CD.LEARNING || disableLearning == true) {
+            return;
+        }
+        if (onRange && (bopInv > 0 || hasSale == true || invIn > 0)) {
+            initLearningMetrics();
+            //Daily learning only applies to RC_AVG_DEMAND and begins immediately when the PL comes on range
+            LocalDate crc = SystemDao.getCrc();
+            Years currYr = Years.years(crc.getYear());
+            double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
+            double defaultWeight = SystemDao.getDefaultWeight();
+            Demand beginOfRunCycleDemand = getDemand(SystemDao.getReviewCycleStartDate());
+            double beginOfRunCycleRcAvgDemand = 0;
+            if(beginOfRunCycleDemand != null){
+                beginOfRunCycleRcAvgDemand = beginOfRunCycleDemand.getRcAvgDemand();
+            }
+
+            if (onRange && !disableLearning) {
+
+                rcAvgDemand = getWeightedWeight1(learningWeekCounter, defaultWeight) * rcDemand / lastWeekLift +
+                        (1 - getWeightedWeight1(learningWeekCounter, defaultWeight)) * beginOfRunCycleRcAvgDemand;
+
+                Map<LocalDate, Demand> currDemandMap = demandMap.get(currYr);
+                if (currDemandMap == null) {
+                    currDemandMap = new TreeMap<LocalDate, Demand>();
+                }
+                Demand d = currDemandMap.get(crc);
+                if (d == null) {
+                    d = new Demand();
+                }
+                d.setRcAvgDemand(rcAvgDemand);
+                currDemandMap.put(crc, d);
+                demandMap.put(currYr, currDemandMap);
+            }
+        }
+    }
+
+    private double getEpDemand() {
+        //assumes this product sells in eaches
+        double demand;
+        double randNum = new Random().nextDouble(); // a random number between 0 and 1;
+        double lostSales = getLostSales();
+        double minDemand = epSalesActual + Math.floor(lostSales);
+        if (randNum < (lostSales - Math.floor(lostSales))) {
+            demand = minDemand + 1;
+        } else {
+            demand = minDemand;
+        }
+        return demand;
+    }
+
+    private void resetEpAccumulators() {
+        epSales = 0.0;
+        epSalesActual = 0;
+        epDemand = 0.0;
+    }
+
+
+    private double getLostSales(){
+        return Math.max(0, rcAvgDemand/7 - epSalesActual);
+    }
+
+    /** Outlier filtering has been done prior to processing daily metrics **/
+    private void processDailyMetrics(){
+
+        LocalDate crc = SystemDao.getCrc();
+
+        //lostSales = max(0, average sales - actual sales)
+        double lostSales = getLostSales();
+
+        rcSalesActual = rcSalesActual + epSalesActual;
+        //rcSales is outlier filtered sales and has been calculated in outlier processing
+        rcSales = rcSales + epSales;
+
+        Years yr = Years.years(crc.getYear());
+        Map<LocalDate, Sales> currSalesMap = salesMap.get(yr);
+        if(currSalesMap == null){
+            currSalesMap = new TreeMap<LocalDate, Sales>();
+        }
+        Sales s = currSalesMap.get(crc);
+        if(s == null) {
+            s = new Sales();
+        }
+        s.setEpSalesActual(epSalesActual);
+        s.setEpSales(epSales);
+        s.setRcSales(rcSales);
+        s.setRcSalesActual(rcSalesActual);
+        s.setLostSales(lostSales);
+
+        currSalesMap.put(crc, s);
+        salesMap.put(yr, currSalesMap);
+
+        /***  Daily Demand Calculations *****/
+        //daily demand
+        epDemand = getEpDemand();
+
+        //demand = sales + lostsales
+        //outlier filtered sales used for rcDemand
+        rcDemand = rcDemand + (rcSales + lostSales);
+
+        rcDemandActual = rcDemandActual + (epSalesActual + lostSales);
+
+
+        Map<LocalDate, Demand> currDemandMap = demandMap.get(yr);
+        if(currDemandMap == null){
+            currDemandMap = new TreeMap<LocalDate, Demand>();
+        }
+        Demand d = currDemandMap.get(crc);
+        if(d == null) {
+            d = new Demand();
+        }
+        d.setEpDemand(epDemand);
+        d.setRcDemand(rcDemand);
+        d.setRcDemandActual(rcDemandActual);
+        d.setRcAvgDemand(rcAvgDemand);
+        d.setRcAvgDemandActual(rcAvgDemandActual);
+
+        currDemandMap.put(crc, d);
+        demandMap.put(yr, currDemandMap);
+
+        /****** Daily Inventory Calculations *******/
+
+        epAvgInv =  Math.max(0, (1 - getWeight1(5) * epAvgInv) + (getWeight1(5)*epEopInv));
+        if(epSales > rcMaxSales){
+            rcMaxSales = epSales;
+            weekSinceMaxSales = 0;
+        }
+
+        if(epEopInv > demoStock){
+            daysSinceWalk = daysSinceWalk + 1;
+        }
+        else{
+            daysSinceWalk = 0;
+        }
+
+        if(epSalesActual == 0){
+            daysSinceSale = daysSinceSale + 1;
+        }
+        else{
+            daysSinceSale = 0;
+        }
+
+        Map<LocalDate, ProductInventory> currInventoryMap = inventoryMap.get(yr);
+        if(currInventoryMap == null){
+            currInventoryMap = new TreeMap<LocalDate, ProductInventory>();
+        }
+        ProductInventory inv = currInventoryMap.get(crc);
+        if(inv == null) {
+            inv = new ProductInventory();
+        }
+        inv.setEpAvgInv(epAvgInv);
+        inv.setEpEopInv(epEopInv);
+        inv.setBopInv(bopInv);
+
+        currInventoryMap.put(crc, inv);
+        inventoryMap.put(yr, currInventoryMap);
+
+        if(statusCd == STATUS_CD.LEARNING) {
+            performDailyLearning();
+        }
+
+        resetEpAccumulators();
+        updateInventory();
+    }
+
+    private void updateInventory(){
+        int minInv = 10;
+        if((invIn - invOut) <= minInv){
+            setBopInv(Vendor.getInventory(invOut));
+            invOut = 0;
+        }
+        else{
+            setBopInv(invIn);
+        }
+        setEpEopInv();
+    }
+
+    private void processWeeklyMetrics() {
         //On the end of the review cycle (Sat night) the rcAvgDemand does not undergo weekly learning
         //For this exercise we do not have time granulity  so weekly processing is done Sunday for the prior week
 
-        LocalDate crc = SystemDao.getCrc().minusDays(1);
+        LocalDate crc = SystemDao.getCrc();
         Sales salesData = getSales(crc);
-        Demand demandData = getDemad(crc);
+        Sales beginOfPeriodSalesData = getSales(SystemDao.getReviewCycleStartDate());
+        double beginOfPeriodRcAvgSales = 0;
+        double beginOfPeriodRcActualSales = 0;
+        if(beginOfPeriodSalesData != null){
+            beginOfPeriodRcAvgSales = beginOfPeriodSalesData.getRcAvgSales();
+            beginOfPeriodRcActualSales = beginOfPeriodSalesData.getRcSalesActual();
+        }
+
+        Demand demandData = getDemand(crc);
+        Demand beginOfPeriodDemandData = getDemand(SystemDao.getReviewCycleStartDate());
+        double beginOfPeriodDemandRcAvgDemand = 0;
+        double beginOfPeriodDemandRcActual = 0;
+        if(beginOfPeriodDemandData != null){
+            beginOfPeriodDemandRcAvgDemand = beginOfPeriodDemandData.getRcAvgDemand();
+            beginOfPeriodDemandRcActual = beginOfPeriodDemandData.getRcDemandActual();
+        }
         double defaultWeight = SystemDao.getDefaultWeight();
 
         double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
 
-        if (statusCd == STATUS_CD.LEARNING && this.disableLearning == false) {
-            //calculated weighted average demand
-
-            //rc_avg_demand = (sales_wt * (rc_lost_sales+rc_sales)/ LastWeeksLift) + (1 - sales_wt) * rc_avg_demand;
-            rcAvgSales = getWeightedWeight1(learningWeekCounter, defaultWeight) * salesData.getRcSales() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * salesData.getRcAvgSales();
-            rcAvgDemand = getWeightedWeight1(learningWeekCounter, defaultWeight) * demandData.getRcDemand() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * demandData.getRcAvgDemand();
-            rcAvgDemandActual = getWeightedWeight1(learningWeekCounter, defaultWeight) * demandData.getRcDemandActual() / lastWeekLift +
-                    (1 - getWeightedWeight1(learningWeekCounter, defaultWeight)) * demandData.getRcDemandActual();
-            storeWeeklyMetrics(crc);
+        rcAvgSalesActual = getWeight1(learningWeekCounter) * salesData.getRcSalesActual() + (1 - getWeight1(learningWeekCounter)) * beginOfPeriodRcActualSales;
+        rcAvgSales = getWeight1(learningWeekCounter) * salesData.getRcSales() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * beginOfPeriodRcAvgSales;
+        rcAvgDemand = getWeight1(learningWeekCounter) * demandData.getRcDemand() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * beginOfPeriodDemandRcAvgDemand;
+        rcAvgDemandActual = getWeightedWeight1(learningWeekCounter, defaultWeight) * demandData.getRcDemandActual() / lastWeekLift +
+                (1 - getWeightedWeight1(learningWeekCounter, defaultWeight)) * beginOfPeriodDemandRcActual;
+        //error checking
+        if (rcAvgDemand == 0 && statusCd != STATUS_CD.INACTIVE) {
+            System.out.println("Error: 0 demand when product status is not inactive");
+        }
+        if (rcAvgDemand >= 4 * rcAvgSales) {
+            rcAvgSales = 4 * rcAvgSalesActual;
+            System.out.println("Error: RC Actual Sales greater then 4 times RC Average Sales");
+        }
+        if (rcAvgDemand >= 3 * rcAvgSalesActual) {
+            rcAvgSales = 3 * rcAvgSalesActual;
+            System.out.println("Error: RC Actual Sales greater then 3 times RC Actual Average Sales");
         }
 
-
-        if (statusCd == STATUS_CD.ACTIVE) {
-            rcAvgSalesActual = getWeight1(learningWeekCounter) * salesData.getRcSalesActual() + (1 - getWeight1(learningWeekCounter)) * salesData.getRcAvgSales();
-            //rcWass2 = getWeight1(4) * Math.pow(salesData.getRcSales(), 2) + (1 - getWeight1(4)) * salesData.getRcAvgSales();
-            rcAvgSales = getWeight1(learningWeekCounter) * salesData.getRcSales() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * salesData.getRcAvgSales();
-            rcAvgDemand = getWeight1(learningWeekCounter) * demandData.getRcDemand() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * demandData.getRcAvgDemand();
-
-            //error checking
-            if (rcAvgDemand == 0 && statusCd != STATUS_CD.INACTIVE) {
-                System.out.println("Error: 0 demand when product status is not inactive");
-            }
-            if (rcAvgDemand >= 4 * rcAvgSales) {
-                rcAvgSales = 4 * rcAvgSalesActual;
-                System.out.println("Error: RC Actual Sales greater then 4 times RC Average Sales");
-            }
-            if (rcAvgDemand >= 3 * rcAvgSalesActual) {
-                rcAvgSales = 3 * rcAvgSalesActual;
-                System.out.println("Error: RC Actual Sales greater then 3 times RC Actual Average Sales");
-            }
-
-            storeWeeklyMetrics(crc);
-        }
+        storeWeeklyMetrics(crc);
         this.learningWeekCounter++;
         //this is the end of the review cycle reset hasBeenOffRange
         if (hasBeenOffRange) {
@@ -402,216 +610,10 @@ public class Product {
     }
 
     private void resetWeeklyMatrics(){
-        rcAvgSales = 0;
-        rcAvgSalesActual = 0;
-        rcWass2 = 0;
-        rcAvgDemand = 0;
-        rcAvgDemandActual = 0;
-    }
-
-
-    public void setDisableLearning(Boolean disableLearning) {
-        //Learning can only be turned on on a SUNDAY
-        if(disableLearning) {
-            if (SystemDao.getCrc().plusDays(1).getDayOfWeek() == DateTimeConstants.SUNDAY)
-                this.disableLearning = disableLearning;
-        }
-        else{
-            this.disableLearning = disableLearning;
-        }
-    }
-
-    private double getDemandUplift(LocalDate dt){
-        Map<LocalDate, List<Event>> currEventMap = eventsMap.get(Years.years(dt.getYear()));
-        if(currEventMap == null){
-            return 1.0;
-        }
-        List<Event> events = currEventMap.get(dt);
-        return Event.calculateDemandUplift(events);
-    }
-
-    private void initLearningMetrics(){
-        if(learningMetricsInitialized){
-            return;
-        }
-        double defaultWeight = SystemDao.getDefaultWeight();
-        double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
-
-        rcAvgSales = getWeightedWeight1(learningWeekCounter, defaultWeight) * totalSales /lastWeekLift +
-                (1 - getWeightedWeight1(learningWeekCounter, defaultWeight))*rcAvgSales;
-
-        //Tim's documentation states:
-        //Its important sales metrics are initialized to AVG_WEEKLY_SALES based on the initialization logic.
-        //This estimates initial values based on different combinations of the PLs product and location
-        //hierarchies dependent on the specific situation for that PL
-        rcAvgSalesActual = rcAvgSales;
-        rcAvgDemand = rcAvgSales;
-        rcOldAvgDemand = rcAvgSales;
-        rcAvgDemandActual = rcAvgSales;
-        epAvgInv = rcAvgSales;
-
-        rcWass2 = Math.pow(rcAvgSales, 2);
-        learningMetricsInitialized = true;
-    }
-
-    private void performDailyLearning() {
-        updateStatusCode();
-        if (statusCd != STATUS_CD.LEARNING) {
-            return;
-        }
-        if (onRange && (bopInv > 0 || hasSale == true || invIn > 0)) {
-            initLearningMetrics();
-            //Daily learning only applies to RC_AVG_DEMAND and begins immediately when the PL comes on range
-            LocalDate crc = SystemDao.getCrc();
-            Years currYr = Years.years(crc.getYear());
-            double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
-            double defaultWeight = SystemDao.getDefaultWeight();
-            if (onRange && !disableLearning) {
-
-                rcAvgDemand = getWeightedWeight1(learningWeekCounter, defaultWeight) * rcDemand / lastWeekLift +
-                        (1 - getWeightedWeight1(learningWeekCounter, defaultWeight)) * rcAvgDemand;
-
-                Map<LocalDate, Demand> currDemandMap = demandMap.get(currYr);
-                if (currDemandMap == null) {
-                    currDemandMap = new TreeMap<LocalDate, Demand>();
-                }
-                Demand d = currDemandMap.get(crc);
-                if (d == null) {
-                    d = new Demand();
-                }
-                d.setRcAvgDemand(rcAvgDemand);
-                currDemandMap.put(crc, d);
-                demandMap.put(currYr, currDemandMap);
-            }
-
-
-
-        }
-    }
-
-    private double calculateEpDemand() {
-        //assumes this product sells in eaches
-        double demand = 0.0;
-        double randNum = new Random().nextDouble(); // a random number between 0 and 1;
-        double lostSales = Math.max(0, totalSales - actualSales);
-        double minDemand = actualSales + Math.floor(lostSales);
-        if (randNum < (lostSales - Math.floor(lostSales))) {
-            demand = minDemand + 1;
-        } else {
-            demand = minDemand;
-        }
-        return demand;
-    }
-
-    private void resetEpAccumulators() {
-        totalSales = 0.0;
-        actualSales = 0;
-        rcSalesActual = 0.0;
-        rcDemand = 0.0;
-        rcDemandActual = 0.0;
-        rcLostUnits = 0.0;
-    }
-
-    private void processDailyMetrics(){
-        LocalDate crc = SystemDao.getCrc();
-
-        //lostSales = max(0, averageSales - actualSales)
-        double lostSales = Math.max(0, totalSales - actualSales);
-
-        //outlier filtering done
-        //totalSales += totalSales + getOutlierFilteredTotalSale();
-        Years yr = Years.years(crc.getYear());
-
-        rcSalesActual = rcSalesActual + actualSales;
-
-        //demand = sales + lostsales
-        double demand = calculateEpDemand();
-        rcDemand = rcDemand + demand;
-
-        double demandActual = actualSales + lostSales;
-        rcDemandActual = rcDemandActual + demandActual;
-
-        rcLostUnits = rcLostUnits + lostSales;
-
-        Map<LocalDate, Demand> currDemandMap = demandMap.get(yr);
-        if(currDemandMap == null){
-            currDemandMap = new TreeMap<LocalDate, Demand>();
-        }
-        Demand d = currDemandMap.get(crc);
-        if(d == null) {
-            d = new Demand();
-        }
-        d.setRcDemand(rcDemand);
-        d.setRcDemandActual(rcDemandActual);
-
-        currDemandMap.put(crc, d);
-        demandMap.put(yr, currDemandMap);
-
-        Map<LocalDate, Sales> currSalesMap = salesMap.get(yr);
-        if(currSalesMap == null){
-            currSalesMap = new TreeMap<LocalDate, Sales>();
-        }
-        Sales s = currSalesMap.get(crc);
-        if(s == null) {
-            s = new Sales();
-        }
-        s.setRcSales(totalSales);
-        s.setRcSalesActual(rcSalesActual);
-        s.setLostSales(rcLostUnits);
-
-        currSalesMap.put(crc, s);
-        salesMap.put(yr, currSalesMap);
-
-        epAvgInv =  Math.max(0, (1 - getWeight1(5) * epAvgInv) + (getWeight1(5)*epEopInv));
-        if(totalSales > rcMaxSales){
-            rcMaxSales = totalSales;
-            weekSinceMaxSales = 0;
-        }
-
-        if(epEopInv > demoStock){
-            daysSinceWalk = daysSinceWalk + 1;
-        }
-        else{
-            daysSinceWalk = 0;
-        }
-
-        if(actualSales == 0){
-            daysSinceSale = daysSinceSale + 1;
-        }
-        else{
-            daysSinceSale = 0;
-        }
-
-
-
-        Map<LocalDate, ProductInventory> currInventoryMap = inventoryMap.get(yr);
-        if(currInventoryMap == null){
-            currInventoryMap = new TreeMap<LocalDate, ProductInventory>();
-        }
-        ProductInventory inv = currInventoryMap.get(crc);
-        if(inv == null) {
-            inv = new ProductInventory();
-        }
-        inv.setEpAvgInv(epAvgInv);
-        inv.setEpEopInv(epEopInv);
-
-        currInventoryMap.put(crc, inv);
-        inventoryMap.put(yr, currInventoryMap);
-
-        if(statusCd == STATUS_CD.LEARNING) {
-            performDailyLearning();
-        }
-
-        resetEpAccumulators();
-        updateInventory();
-    }
-
-    private void updateInventory(){
-        if(bopInv == invOut + 10 ){
-            setBopInv(Vendor.getInventory(invOut));
-            invOut = 0;
-        }
-        setEpEopInv();
+        rcSales = 0;
+        rcSalesActual = 0;
+        rcDemand = 0;
+        rcDemandActual = 0;
     }
 
     public double getWeightedWeight1(long age, double defaultWeight) {
@@ -682,14 +684,167 @@ public class Product {
     }
 
     private String salesToString(){
+        StringBuffer epSalesActualBf = new StringBuffer();
+        epSalesActualBf.append("epSalesActual|");
+        StringBuffer epSalesBf = new StringBuffer();
+        epSalesBf.append("epSales|");
+
         StringBuffer rcSalesBf = new StringBuffer();
-        rcSalesBf.append("totalSales|");
+        rcSalesBf.append("rcSales|");
         StringBuffer rcAvgSalesBf = new StringBuffer();
         rcAvgSalesBf.append("rcAvgSales|");
+
         StringBuffer rcSalesActualBf = new StringBuffer();
         rcSalesActualBf.append("rcSalesActual|");
         StringBuffer rcAvgSalesActualBf = new StringBuffer();
         rcAvgSalesActualBf.append("rcAvgSalesActual|");
+
+        Iterator<Years> yrItr = salesMap.keySet().iterator();
+        Map<LocalDate, Sales> currSalesMap;
+        LocalDate currDate;
+        Years currYr;
+        Sales currSale;
+        //Populate Sale buffers
+        while(yrItr.hasNext()){
+            currYr = yrItr.next();
+            currSalesMap = salesMap.get(currYr);
+            Iterator<LocalDate> itr = currSalesMap.keySet().iterator();
+            while(itr.hasNext()){
+                currDate = itr.next();
+                currSale = currSalesMap.get(currDate);
+                //epSaleActual
+                epSalesActualBf.append(currDate);
+                epSalesActualBf.append(":");
+                epSalesActualBf.append(currSale.getEpSalesActual());
+                epSalesActualBf.append("|");
+                //epSale
+                epSalesBf.append(currDate);
+                epSalesBf.append(":");
+                epSalesBf.append(currSale.getEpSales());
+                epSalesBf.append("|");
+                //rc sales actual
+                rcSalesActualBf.append(currDate);
+                rcSalesActualBf.append(":");
+                rcSalesActualBf.append(currSale.getRcSalesActual());
+                rcSalesActualBf.append("|");
+                //rc average sales actual
+                rcAvgSalesActualBf.append(currDate);
+                rcAvgSalesActualBf.append(":");
+                rcAvgSalesActualBf.append(currSale.getRcAvgSalesActual());
+                rcAvgSalesActualBf.append("|");
+                //rc sales
+                rcSalesBf.append(currDate);
+                rcSalesBf.append(":");
+                rcSalesBf.append(currSale.getRcSales());
+                rcSalesBf.append("|");
+                //rc sales average
+                rcAvgSalesBf.append(currDate);
+                rcAvgSalesBf.append(":");
+                rcAvgSalesBf.append(currSale.getRcAvgSales());
+                rcAvgSalesBf.append("|");
+
+            }
+        }
+        epSalesActualBf.append(";\n");
+        epSalesBf.append(";\n");
+        rcSalesActualBf.append(";\n");
+        rcAvgSalesActualBf.append(";\n");
+        rcSalesBf.append(";\n");
+        rcAvgSalesBf.append(";\n");
+
+        StringBuffer retBf = new StringBuffer();
+        retBf.append(epSalesActualBf.toString());
+        retBf.append(epSalesBf.toString());
+        retBf.append(rcSalesActualBf.toString());
+        retBf.append(rcAvgSalesActualBf.toString());
+        retBf.append(rcSalesBf.toString());
+        retBf.append(rcAvgSalesBf.toString());
+        retBf.append("\n");
+
+        return retBf.toString();
+    }
+
+    private String demandToString(){
+        Iterator<Years> yrItr = demandMap.keySet().iterator();
+        Map<LocalDate, Demand> currDemandMap;
+        Years currYr;
+        LocalDate currDate;
+        Demand currDemand;
+
+        StringBuffer epDemandBf = new StringBuffer();
+        epDemandBf.append("epDemand|");
+        StringBuffer rcActualDemandBf = new StringBuffer();
+        rcActualDemandBf.append("rcActualDemand|");
+        StringBuffer rcDemandBf = new StringBuffer();
+        rcDemandBf.append("rcDemand|");
+        StringBuffer rcAvgDemandBf = new StringBuffer();
+        rcAvgDemandBf.append("rcAvgDemand|");
+        StringBuffer rcAvgDemandActualBf = new StringBuffer();
+        rcAvgDemandActualBf.append("rcAvgDemandActual|");
+
+
+        while(yrItr.hasNext()){
+            currYr = yrItr.next();
+            currDemandMap = demandMap.get(currYr);
+            Iterator<LocalDate> itr = currDemandMap.keySet().iterator();
+            while(itr.hasNext()){
+                currDate = itr.next();
+                currDemand = currDemandMap.get(currDate);
+                //ep demand
+                epDemandBf.append(currDate);
+                epDemandBf.append(":");
+                epDemandBf.append(currDemand.getEpDemand());
+                epDemandBf.append("|");
+                //actual demand
+                rcActualDemandBf.append(currDate);
+                rcActualDemandBf.append(":");
+                rcActualDemandBf.append(currDemand.getRcDemandActual());
+                rcActualDemandBf.append("|");
+                //rc demand
+                rcDemandBf.append(currDate);
+                rcDemandBf.append(":");
+                rcDemandBf.append(currDemand.getRcDemand());
+                rcDemandBf.append("|");
+                //rc average demand
+                rcAvgDemandBf.append(currDate);
+                rcAvgDemandBf.append(":");
+                rcAvgDemandBf.append(currDemand.getRcAvgDemand());
+                rcAvgDemandBf.append("|");
+                //rc average demand actual
+                rcAvgDemandActualBf.append(currDate);
+                rcAvgDemandActualBf.append(":");
+                rcAvgDemandActualBf.append(currDemand.getRcAvgDemandActual());
+                rcAvgDemandActualBf.append("|");
+            }
+        }
+        rcActualDemandBf.append(";\n");
+        epDemandBf.append(";\n");
+        rcDemandBf.append(";\n");
+        rcAvgDemandBf.append(";\n");
+        rcAvgDemandActualBf.append(";\n");
+
+        StringBuffer retBf = new StringBuffer();
+        retBf.append(epDemandBf.toString());
+        retBf.append(rcActualDemandBf.toString());
+        retBf.append(rcDemandBf.toString());
+        retBf.append(rcAvgDemandBf.toString());
+        retBf.append(rcAvgDemandActualBf.toString());
+        retBf.append("\n");
+
+        return retBf.toString();
+    }
+/*
+    private String inventoryToString(){
+        StringBuffer bopBf = new StringBuffer();
+        bopBf.append("bopInv|");
+        StringBuffer invInBf = new StringBuffer();
+        invInBf.append("invIn|");
+        StringBuffer epAvgInvInBf = new StringBuffer();
+        epAvgInvInBf.append("epAvgInvIn|");
+        StringBuffer invOutBf = new StringBuffer();
+        invOutBf.append("invOut|");
+        StringBuffer epEopInvBf = new StringBuffer();
+        epEopInvBf.append("epEopInv|");
 
         Iterator<Years> yrItr = salesMap.keySet().iterator();
         Map<LocalDate, Sales> currSalesMap;
@@ -741,65 +896,5 @@ public class Product {
 
         return retBf.toString();
     }
-
-    private String demandToString(){
-        Iterator<Years> yrItr = demandMap.keySet().iterator();
-        Map<LocalDate, Demand> currDemandMap;
-        Years currYr;
-        LocalDate currDate;
-        Demand currDemand;
-
-        StringBuffer rcActualDemandBf = new StringBuffer();
-        rcActualDemandBf.append("rcActualDemand|");
-        StringBuffer rcDemandBf = new StringBuffer();
-        rcDemandBf.append("rcDemand|");
-        StringBuffer rcAvgDemandBf = new StringBuffer();
-        rcAvgDemandBf.append("rcAvgDemand|");
-        StringBuffer rcAvgDemandActualBf = new StringBuffer();
-        rcAvgDemandActualBf.append("rcAvgDemandActual|");
-
-
-        while(yrItr.hasNext()){
-            currYr = yrItr.next();
-            currDemandMap = demandMap.get(currYr);
-            Iterator<LocalDate> itr = currDemandMap.keySet().iterator();
-            while(itr.hasNext()){
-                currDate = itr.next();
-                currDemand = currDemandMap.get(currDate);
-                //actual demand
-                rcActualDemandBf.append(currDate);
-                rcActualDemandBf.append(":");
-                rcActualDemandBf.append(currDemand.getRcDemandActual());
-                rcActualDemandBf.append("|");
-                //rc demand
-                rcDemandBf.append(currDate);
-                rcDemandBf.append(":");
-                rcDemandBf.append(currDemand.getRcDemand());
-                rcDemandBf.append("|");
-                //rc average demand
-                rcAvgDemandBf.append(currDate);
-                rcAvgDemandBf.append(":");
-                rcAvgDemandBf.append(currDemand.getRcAvgDemand());
-                rcAvgDemandBf.append("|");
-                //rc average demand actual
-                rcAvgDemandActualBf.append(currDate);
-                rcAvgDemandActualBf.append(":");
-                rcAvgDemandActualBf.append(currDemand.getRcAvgDemandActual());
-                rcAvgDemandActualBf.append("|");
-            }
-        }
-        rcActualDemandBf.append(";\n");
-        rcDemandBf.append(";\n");
-        rcAvgDemandBf.append(";\n");
-        rcAvgDemandActualBf.append(";\n");
-
-        StringBuffer retBf = new StringBuffer();
-        retBf.append(rcActualDemandBf.toString());
-        retBf.append(rcDemandBf.toString());
-        retBf.append(rcAvgDemandBf.toString());
-        retBf.append(rcAvgDemandActualBf.toString());
-        retBf.append("\n");
-
-        return retBf.toString();
-    }
+    */
 }
