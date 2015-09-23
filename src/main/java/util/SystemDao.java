@@ -11,7 +11,7 @@ import java.util.List;
  * Created by skorti on 8/31/15.
  */
 public class SystemDao {
-    static LocalDate crc = new LocalDate().withYear(2013).withMonthOfYear(1).withDayOfMonth(1);
+    static LocalDate crc = new LocalDate().withYear(2013).withMonthOfYear(1).withDayOfMonth(6);
     private static LocalDate reviewCycleStartDate = crc;
     private static LocalDate reviewCycleEndDate = getReviewCycleEndDate();
     private static double defaultWeight = 1.0;
@@ -72,14 +72,11 @@ public class SystemDao {
 
 
     public static LocalDate getReviewCycleStartDate(){
-        return crc.withDayOfWeek(DateTimeConstants.SUNDAY);
+        int weekday = DateTimeConstants.SUNDAY;
+        LocalDate retVal = (crc.getDayOfWeek() < weekday)?crc.minusDays(crc.getDayOfWeek()):crc;
+        return retVal;
     }
 
-/*
-    public static void addLocation(Location loc) {
-        locations.add(loc);
-    }
-*/
 
     public static int getSpecialPurchaseOrderWassMultiplier() {
         return specialPurchaseOrderWassMultiplier;

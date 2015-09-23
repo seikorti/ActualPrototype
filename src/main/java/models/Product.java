@@ -83,7 +83,7 @@ public class Product {
         highSeasonality = false;
         eventSeasonalIndicator = false;
         epSales = 75; //assumes this is the average for similar product across departments in STG
-        innerPackQty = 10;
+        innerPackQty = 1;
         syncInventory = false;
         onRange = true;
         bopInv = 1000;
@@ -108,30 +108,15 @@ public class Product {
 
     public void peformDemandLearning(String locationId) {
         //System.out.println("Starting the Demand Learning for product/location: " + locationId);
-        initLearningMetrics();
+
         performDailyLearning();
     }
 
-    //Hook: MSSalesOutlierCheckHook.java
-    public void performOutlierProcessing(String locId) {
-        // only apply constraint if we are not in a seasonal period
-        System.out.println("Starting the Outlier/Unreported Sales Calculation for product/location: " + locId);
 
-        int specialPuchaseOrderWassMult = SystemDao.getSpecialPurchaseOrderWassMultiplier();
-        int specialPuchaseOrderSizeMult = SystemDao.getSpecialPurchaseOrderSizeMultipler();
-        double rcWass2 = Math.pow(rcAvgSales, 2);
-        Double maxValue = Math.max(rcAvgSales + specialPuchaseOrderSizeMult * Math.sqrt(Math.max(0, rcWass2)), specialPuchaseOrderWassMult * innerPackQty);
-        if(epSalesActual > maxValue && eventSeasonalIndicator == false){
-            epSales = maxValue;
-        }
-        else{
-            epSales = epSalesActual;
-        }
-
-    }
 
     public void performPreprocessing(String locationId) {
         System.out.println("Starting Pre-Processing for product/location: " + locationId);
+        initLearningMetrics();
 
     }
 
@@ -405,6 +390,24 @@ public class Product {
         epDemand = 0.0;
     }
 
+    //Hook: MSSalesOutlierCheckHook.java
+    public void performOutlierProcessing(String locId) {
+        // only apply constraint if we are not in a seasonal period
+        System.out.println("Starting the Outlier/Unreported Sales Calculation for product/location: " + locId);
+
+        int specialPuchaseOrderWassMult = SystemDao.getSpecialPurchaseOrderWassMultiplier();
+        int specialPuchaseOrderSizeMult = SystemDao.getSpecialPurchaseOrderSizeMultipler();
+        double rcWass2 = Math.pow(rcAvgSales, 2);
+        Double maxValue = Math.max(rcAvgSales + specialPuchaseOrderSizeMult * Math.sqrt(Math.max(0, rcWass2)), specialPuchaseOrderWassMult * innerPackQty);
+        if(epSalesActual > maxValue && eventSeasonalIndicator == false){
+            epSales = maxValue;
+        }
+        else{
+            epSales = epSalesActual;
+        }
+
+    }
+
 
     private double getLostSales(){
         return Math.max(0, rcAvgDemand/7 - epSalesActual);
@@ -533,29 +536,36 @@ public class Product {
         Sales salesData = getSales(crc);
         Sales beginOfPeriodSalesData = getSales(SystemDao.getReviewCycleStartDate());
         double beginOfPeriodRcAvgSales = 0;
-        double beginOfPeriodRcActualSales = 0;
+        double beginOfPeriodRcActualAvgSales = 0;
         if(beginOfPeriodSalesData != null){
             beginOfPeriodRcAvgSales = beginOfPeriodSalesData.getRcAvgSales();
-            beginOfPeriodRcActualSales = beginOfPeriodSalesData.getRcSalesActual();
+            beginOfPeriodRcActualAvgSales = beginOfPeriodSalesData.getRcAvgSalesActual();
         }
 
         Demand demandData = getDemand(crc);
         Demand beginOfPeriodDemandData = getDemand(SystemDao.getReviewCycleStartDate());
-        double beginOfPeriodDemandRcAvgDemand = 0;
-        double beginOfPeriodDemandRcActual = 0;
+        double beginOfPeriodRcAvgDemand = 0;
+        double beginOfPeriodRcAvgActualDemand = 0;
         if(beginOfPeriodDemandData != null){
-            beginOfPeriodDemandRcAvgDemand = beginOfPeriodDemandData.getRcAvgDemand();
-            beginOfPeriodDemandRcActual = beginOfPeriodDemandData.getRcDemandActual();
+            beginOfPeriodRcAvgDemand = beginOfPeriodDemandData.getRcAvgDemand();
+            beginOfPeriodRcAvgActualDemand = beginOfPeriodDemandData.getRcAvgDemandActual();
         }
         double defaultWeight = SystemDao.getDefaultWeight();
 
         double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
+        double weight = 1;
+        if(statusCd == STATUS_CD.LEARNING){
+            weight = getWeightedWeight1(learningWeekCounter, defaultWeight);
+        }
+        else if(statusCd == STATUS_CD.ACTIVE){
+            weight = getWeight1(learningWeekCounter);
+        }
 
-        rcAvgSalesActual = getWeight1(learningWeekCounter) * salesData.getRcSalesActual() + (1 - getWeight1(learningWeekCounter)) * beginOfPeriodRcActualSales;
-        rcAvgSales = getWeight1(learningWeekCounter) * salesData.getRcSales() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * beginOfPeriodRcAvgSales;
-        rcAvgDemand = getWeight1(learningWeekCounter) * demandData.getRcDemand() / lastWeekLift + (1 - getWeight1(learningWeekCounter)) * beginOfPeriodDemandRcAvgDemand;
-        rcAvgDemandActual = getWeightedWeight1(learningWeekCounter, defaultWeight) * demandData.getRcDemandActual() / lastWeekLift +
-                (1 - getWeightedWeight1(learningWeekCounter, defaultWeight)) * beginOfPeriodDemandRcActual;
+        rcAvgSalesActual = (weight * (salesData.getRcSalesActual() / lastWeekLift)) + ((1 - weight) * beginOfPeriodRcActualAvgSales);
+        rcAvgSales = (weight * (salesData.getRcSales() / lastWeekLift)) + ((1 - weight) * beginOfPeriodRcAvgSales);
+        rcAvgDemand = (weight * (demandData.getRcDemand() / lastWeekLift)) + ((1 - weight) * beginOfPeriodRcAvgDemand);
+        rcAvgDemandActual = (weight * (demandData.getRcDemandActual() / lastWeekLift)) + ((1 - weight) * beginOfPeriodRcAvgActualDemand);
+
         //error checking
         if (rcAvgDemand == 0 && statusCd != STATUS_CD.INACTIVE) {
             System.out.println("Error: 0 demand when product status is not inactive");

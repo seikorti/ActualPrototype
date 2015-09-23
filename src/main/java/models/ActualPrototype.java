@@ -55,7 +55,7 @@ public class ActualPrototype {
     Collection<Location> locations =  LocationDao.getInstance().getLocations();
 
     public ActualPrototype(){
-        LocalDate crc = new LocalDate().withYear(2013).withMonthOfYear(1).withDayOfMonth(1);
+        LocalDate crc = new LocalDate().withYear(2013).withMonthOfYear(1).withDayOfMonth(6);
         SystemDao.setCrc(crc);
         processingHooks.add(new PreProcessingHook());
         processingHooks.add(new OutlierCheckProcessingHook());
