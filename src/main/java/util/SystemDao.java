@@ -77,6 +77,13 @@ public class SystemDao {
         return retVal;
     }
 
+    public static LocalDate getPreviousCRCStartDate(){
+        int weekday = DateTimeConstants.SUNDAY;
+        LocalDate previousReviewCycle = crc.minusWeeks(1);
+        LocalDate retVal = (previousReviewCycle.getDayOfWeek() < weekday)?previousReviewCycle.minusDays(previousReviewCycle.getDayOfWeek()):previousReviewCycle;
+        return retVal;
+    }
+
 
     public static int getSpecialPurchaseOrderWassMultiplier() {
         return specialPurchaseOrderWassMultiplier;

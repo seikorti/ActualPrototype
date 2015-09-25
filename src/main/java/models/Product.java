@@ -82,7 +82,7 @@ public class Product {
         learningMetricsInitialized = false;
         highSeasonality = false;
         eventSeasonalIndicator = false;
-        epSales = 75; //assumes this is the average for similar product across departments in STG
+        epSales = 25; //assumes this is the average for similar product across departments in STG
         innerPackQty = 1;
         syncInventory = false;
         onRange = true;
@@ -355,33 +355,12 @@ public class Product {
                 rcAvgDemand = getWeightedWeight1(learningWeekCounter, defaultWeight) * rcDemand / lastWeekLift +
                         (1 - getWeightedWeight1(learningWeekCounter, defaultWeight)) * beginOfRunCycleRcAvgDemand;
 
-                Map<LocalDate, Demand> currDemandMap = demandMap.get(currYr);
-                if (currDemandMap == null) {
-                    currDemandMap = new TreeMap<LocalDate, Demand>();
-                }
-                Demand d = currDemandMap.get(crc);
-                if (d == null) {
-                    d = new Demand();
-                }
-                d.setRcAvgDemand(rcAvgDemand);
-                currDemandMap.put(crc, d);
-                demandMap.put(currYr, currDemandMap);
             }
         }
     }
 
     private double getEpDemand() {
-        //assumes this product sells in eaches
-        double demand;
-        double randNum = new Random().nextDouble(); // a random number between 0 and 1;
-        double lostSales = getLostSales();
-        double minDemand = epSalesActual + Math.floor(lostSales);
-        if (randNum < (lostSales - Math.floor(lostSales))) {
-            demand = minDemand + 1;
-        } else {
-            demand = minDemand;
-        }
-        return demand;
+        return epSales + getLostSales();
     }
 
     private void resetEpAccumulators() {
@@ -449,9 +428,9 @@ public class Product {
 
         //demand = sales + lostsales
         //outlier filtered sales used for rcDemand
-        rcDemand = rcDemand + (rcSales + lostSales);
+        rcDemand =  rcSales + lostSales;
 
-        rcDemandActual = rcDemandActual + (epSalesActual + lostSales);
+        rcDemandActual += (epSalesActual + lostSales);
 
 
         Map<LocalDate, Demand> currDemandMap = demandMap.get(yr);
@@ -465,8 +444,8 @@ public class Product {
         d.setEpDemand(epDemand);
         d.setRcDemand(rcDemand);
         d.setRcDemandActual(rcDemandActual);
-        d.setRcAvgDemand(rcAvgDemand);
-        d.setRcAvgDemandActual(rcAvgDemandActual);
+        //d.setRcAvgDemand(rcAvgDemand);
+        //d.setRcAvgDemandActual(rcAvgDemandActual);
 
         currDemandMap.put(crc, d);
         demandMap.put(yr, currDemandMap);
@@ -533,8 +512,10 @@ public class Product {
         //For this exercise we do not have time granulity  so weekly processing is done Sunday for the prior week
 
         LocalDate crc = SystemDao.getCrc();
+        LocalDate prevCRCStartDate = SystemDao.getPreviousCRCStartDate();
         Sales salesData = getSales(crc);
-        Sales beginOfPeriodSalesData = getSales(SystemDao.getReviewCycleStartDate());
+
+        Sales beginOfPeriodSalesData = getSales(prevCRCStartDate);
         double beginOfPeriodRcAvgSales = 0;
         double beginOfPeriodRcActualAvgSales = 0;
         if(beginOfPeriodSalesData != null){
@@ -543,7 +524,7 @@ public class Product {
         }
 
         Demand demandData = getDemand(crc);
-        Demand beginOfPeriodDemandData = getDemand(SystemDao.getReviewCycleStartDate());
+        Demand beginOfPeriodDemandData = getDemand(prevCRCStartDate);
         double beginOfPeriodRcAvgDemand = 0;
         double beginOfPeriodRcAvgActualDemand = 0;
         if(beginOfPeriodDemandData != null){
@@ -552,8 +533,8 @@ public class Product {
         }
         double defaultWeight = SystemDao.getDefaultWeight();
 
-        double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
-        double weight = 1;
+        double lastWeekLift = getDemandUplift(prevCRCStartDate);
+        double weight = 1.0;
         if(statusCd == STATUS_CD.LEARNING){
             weight = getWeightedWeight1(learningWeekCounter, defaultWeight);
         }
