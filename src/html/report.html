@@ -33,7 +33,8 @@
             <textarea id="debug_info"></textarea>
 
             <hr/>
-            <input id="fileInput" type="file" class="btn btn-default" onchange="$(this).trigger('readFile'); return false;" />
+            <input id="fileInput" type="file" class="btn btn-default"
+                   onchange="$(this).trigger('readFile'); return false;"/>
             <button id="generate" class="btn btn-default" onclick="$(this).trigger('generate')">generate
             <span class="input-group-btn">
         <button id="clrBtn" class="btn btn-default" type="button" onclick="$(this).trigger('clear')">X</button>
@@ -80,6 +81,30 @@
 
     var dtRcAvgDemandActual = [];
     var vRcAvgDemandActual = [];
+
+    var dtEpAvgInv = [];
+    var vEpAvgInv = [];
+
+    var dtEpEopInv = [];
+    var vEpEopInv = [];
+
+    var dtEpInvOut = [];
+    var vEpInvOut = [];
+
+    var dtEpInvIn = [];
+    var vEpInvIn = [];
+
+    var dtRcBopInv = [];
+    var vRcBopInv = [];
+
+    var dtRcInvIn = [];
+    var vRcInvIn = [];
+
+    var dtRcInvOut = [];
+    var vRcInvOut = [];
+
+    var dtActualInv = [];
+    var vActualInv = [];
 
     var inputFileContent;
 
@@ -151,7 +176,7 @@
         $('#generate').on('generate', function (evt) {
             var tmpdata = $("#debug_info").val();
 
-            if(inputFileContent){
+            if (inputFileContent) {
                 tmpdata = inputFileContent;
             }
 
@@ -245,21 +270,97 @@
                 vRcAvgDemandActual = data.yValue;
             }
 
+            /*** Inventory ***/
+
+
+            data = getData(tmpdata, "EpAvgInv");
+            dtEpAvgInv = [];
+            vEpAvgInv = [];
+            if (data) {
+                dtEpAvgInv = data.xValue;
+                vEpAvgInv = data.yValue;
+            }
+
+            data = getData(tmpdata, "EpEopInv");
+            dtEpEopInv = [];
+            vEpEopInv = [];
+            if (data) {
+                dtEpEopInv = data.xValue;
+                vEpEopInv = data.yValue;
+            }
+
+            data = getData(tmpdata, "EpInvOut");
+            dtEpInvOut = [];
+            vEpInvOut = [];
+            if (data) {
+                dtEpInvOut = data.xValue;
+                vEpInvOut = data.yValue;
+            }
+
+            data = getData(tmpdata, "EpInvIn");
+            dtEpInvIn = [];
+            vEpInvIn = [];
+            if (data) {
+                dtEpInvIn = data.xValue;
+                vEpInvIn = data.yValue;
+            }
+
+            data = getData(tmpdata, "RcBopInv");
+            dtRcBopInv = [];
+            vRcBopInv = [];
+            if (data) {
+                dtRcBopInv = data.xValue;
+                vRcBopInv = data.yValue;
+            }
+
+            data = getData(tmpdata, "RcInvIn");
+            dtRcInvIn = [];
+            vRcInvIn = [];
+            if (data) {
+                dtRcInvIn = data.xValue;
+                vRcInvIn = data.yValue;
+            }
+
+            data = getData(tmpdata, "RcInvOut");
+            dtRcInvOut = [];
+            vRcInvOut = [];
+            if (data) {
+                dtRcInvOut = data.xValue;
+                vRcInvOut = data.yValue;
+            }
+
+            data = getData(tmpdata, "ActualInv");
+            dtActualInv = [];
+            vActualInv = [];
+            if (data) {
+                dtActualInv = data.xValue;
+                vActualInv = data.yValue;
+            }
+
             var c3data = {
                 xs: {
                     //Declare the axes
-                    'EpSalesActual':'EpSalesActualXdata',
-                    'EpSales':'EpSalesXdata',
+                    'EpSalesActual': 'EpSalesActualXdata',
+                    'EpSales': 'EpSalesXdata',
                     'RcSalesActual': 'RcSalesActualXdata',
                     'RcAvgSalesActual': 'RcAvgSalesActualXdata',
                     'RcSales': 'RcSalesXdata',
                     'RcAvgSales': 'RcAvgSalesXdata',
 
-                    'EpDemand':'EpDemandXdata',
+                    'EpDemand': 'EpDemandXdata',
                     'RcActualDemand': 'RcActualDemandXdata',
                     'RcDemand': 'RcDemandXdata',
                     'RcAvgDemand': 'RcAvgDemandXdata',
-                    'RcAvgDemandActual': "RcAvgDemandActualXdata"
+                    'RcAvgDemandActual': "RcAvgDemandActualXdata",
+
+                    'EpAvgInv': 'EpAvgInvXdata',
+                    'EpEopInv': 'EpEopInvXdata',
+                    'EpInvOut': 'EpInvOutXdata',
+                    'EpInvIn': 'EpInvInXdata',
+                    'RcBopInv': 'RcBopInvXdata',
+                    'RcInvIn': 'RcInvInXdata',
+                    'RcInvOut': 'RcInvOutXdata',
+                    'ActualInv':'ActualInvXdata'
                 },
                 columns: [
 
@@ -287,17 +388,36 @@
                     ['RcActualDemandXdata'].concat(dtRcActualDemand),
                     ['RcDemandXdata'].concat(dtRcDemand),
                     ['RcAvgDemandXdata'].concat(dtRcAvgDemand),
-                    ['RcAvgDemandActualXdata'].concat(dtRcAvgDemandActual)
+                    ['RcAvgDemandActualXdata'].concat(dtRcAvgDemandActual),
+
+                    ['EpAvgInv'].concat(vEpAvgInv),
+                    ['EpEopInv'].concat(vEpEopInv),
+                    ['EpInvOut'].concat(vEpInvOut),
+                    ['EpInvIn'].concat(vEpInvIn),
+                    ['RcBopInv'].concat(vRcBopInv),
+                    ['RcInvIn'].concat(vRcInvIn),
+                    ['RcInvOut'].concat(vRcInvOut),
+                    ['ActualInv'].concat(vActualInv),
+
+                    ['EpAvgInvXdata'].concat(dtEpAvgInv),
+                    ['EpEopInvXdata'].concat(dtEpEopInv),
+                    ['EpInvOutXdata'].concat(dtEpInvOut),
+                    ['EpInvInXdata'].concat(dtEpInvIn),
+                    ['RcBopInvXdata'].concat(dtRcBopInv),
+                    ['RcInvInXdata'].concat(dtRcInvIn),
+                    ['RcInvOutXdata'].concat(dtRcInvOut),
+                    ['ActualInvXdata'].concat(dtActualInv)
 
                 ],
-                types:{
-                    RcAvgSales:'bar',
-                    RcAvgSalesActual:'bar',
-                    RcAvgDemand:'bar',
-                    RcAvgDemandActual:'bar'
+                types: {
+                    RcAvgSales: 'bar',
+                    RcAvgSalesActual: 'bar',
+                    RcAvgDemand: 'bar',
+                    RcAvgDemandActual: 'bar',
+                    EpAvgInv : 'bar'
                 },
 
-                hide: ['EpSalesActual', 'EpSales', 'RcSalesActual','RcAvgSalesActual','RcSales','EpDemand','RcActualDemand','RcDemand','RcAvgDemandActual']
+                hide: true
             };
             var chart = c3.generate({
                 data: c3data,

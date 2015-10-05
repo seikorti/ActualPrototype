@@ -2,7 +2,6 @@ package models;
 
 import org.joda.time.*;
 import util.SystemDao;
-
 import java.util.*;
 
 /**
@@ -20,7 +19,6 @@ public class Product {
 
 
     int inventory;
-    int invIn;
     LocalDate firstSalesDate;
     LocalDate storeOpenDate;
     LocalDate firstReceiptDate;
@@ -29,7 +27,6 @@ public class Product {
     int innerPackQty;
     int numberOfDaysToBecomeActive;
     boolean syncInventory;
-    int invOut;
 
     //RC Accumulators
     double rcAvgSales;
@@ -41,15 +38,17 @@ public class Product {
     double rcAvgDemand;
     double rcAvgDemandActual;
     double rcOldAvgDemand;
-
+    int rcBopInv;
+    int rcInvIn;
+    int rcInvOut;
 
     //EP Accumulators
     double epAvgInv;
     int epEopInv;
-    int bopInv;
+    int epInvOut;
+    int epInvIn;
 
     double rcWass2;
-
 
     Boolean eventSeasonalIndicator;
     private int daysSinceWalk;
@@ -61,7 +60,6 @@ public class Product {
     private boolean disableLearning;
     private boolean onRange;
     private boolean hasSale;
-    //double rcLostUnits;
     private boolean hasBeenOffRange;
     private boolean learningMetricsInitialized;
     private boolean highSeasonality;
@@ -69,6 +67,7 @@ public class Product {
     private double epSalesActual;
     private double epDemand;
     private double rcSales;
+    private boolean isStockedOut;
 
 
     public enum STATUS_CD {
@@ -86,9 +85,10 @@ public class Product {
         innerPackQty = 1;
         syncInventory = false;
         onRange = true;
-        bopInv = 1000;
+        rcBopInv = 1000;
         demoStock = 20;
         rcSales = 0;
+        isStockedOut = false;
     }
 
 
@@ -102,27 +102,22 @@ public class Product {
         System.out.println("Starting the Weekly Metrics Processing for product/location: " + locationId);
         if(SystemDao.getCrc().getDayOfWeek() == DateTimeConstants.SUNDAY) {
             processWeeklyMetrics();
-
         }
     }
 
     public void peformDemandLearning(String locationId) {
-        //System.out.println("Starting the Demand Learning for product/location: " + locationId);
-
+        System.out.println("Starting the Demand Learning for product/location: " + locationId);
         performDailyLearning();
     }
-
 
 
     public void performPreprocessing(String locationId) {
         System.out.println("Starting Pre-Processing for product/location: " + locationId);
         initLearningMetrics();
-
     }
 
     public void performPostProcessing(String locationId) {
         System.out.println("Starting Post-Processing for product/location: " + locationId);
-
     }
 
     public void performResetAndCounter(String locationId) {
@@ -179,28 +174,62 @@ public class Product {
         locations.add(location);
     }
 
-    public void setBopInv(int bopInv) {
-        if(SystemDao.getCrc().getDayOfWeek() == DateTimeConstants.SUNDAY) {
-            this.bopInv = bopInv;
+
+    public int getInventory() {
+        return inventory;
+    }
+
+    public void setInventory(int inventory) {
+        this.inventory += inventory;
+        epInvIn += inventory;
+    }
+
+    private void processInventory(){
+        LocalDate crc = SystemDao.getCrc();
+        if(isStockedOut){
+            Demand d = getDemand(SystemDao.getCrc());
+            if(crc.getDayOfWeek() == DateTimeConstants.SUNDAY){
+                d = getDemand(SystemDao.getReviewCycleStartDate());
+            }
+            int targetInv = (int) d.getRcAvgDemand() - inventory;
+
+            setInventory(targetInv > 0 ? targetInv : (int) d.getRcAvgDemand());
+            isStockedOut = false;
         }
+
+        if(crc.getDayOfWeek() == DateTimeConstants.SUNDAY){
+            rcBopInv = inventory;
+        }
+        //daily inventory updates
+        updateEpEopInv();
+        epEopInv = inventory;
+        rcInvOut += epInvOut;
+        rcInvIn += epInvIn;
+        ProductInventory p = getInventory(SystemDao.getReviewCycleStartDate());
+        double beginOfPeriodEpAvgInv = 0;
+        if (p != null) {
+            beginOfPeriodEpAvgInv = p.getEpAvgInv();
+        }
+        double weight_5 = SystemDao.getWeight_5();
+        epAvgInv = weight_5 * ((epEopInv >= 0) ? epEopInv : 0) + (((1 - weight_5) * beginOfPeriodEpAvgInv));
+        epAvgInv = Math.max(0, epAvgInv);
     }
 
-    public void setInvIn(int invIn) {
-        this.invIn = invIn;
-    }
 
-
-    protected void processSale(Integer sale){
+    protected boolean processSale(Integer sale){
         hasSale = true;
+        if(inventory - sale < 0){
+            isStockedOut = true;
+            epSalesActual += 0;
+            epInvOut += 0;
+            return false;
+        }
         epSalesActual += sale;
         inventory -= sale;
-        invOut += sale;
-        invIn -= sale;
+        epInvOut += sale;
+        return true;
     }
 
-    public Boolean getOnRange() {
-        return onRange;
-    }
 
     public void setOnRange(Boolean onRange) {
         if(!onRange){
@@ -209,9 +238,6 @@ public class Product {
         this.onRange = onRange;
     }
 
-    public LocalDate getFirstSalesDate() {
-        return firstSalesDate;
-    }
 
     public void setFirstSalesDate(LocalDate firstSalesDate) {
         if(firstSalesDate == null && epSalesActual > 0){
@@ -222,12 +248,9 @@ public class Product {
         }
     }
 
-    public LocalDate getFirstReceiptDate() {
-        return firstReceiptDate;
-    }
 
     public void setFirstReceiptDate(LocalDate firstReceiptDate) {
-        if(this.firstReceiptDate == null && epEopInv > 0 || invIn > 0){
+        if(this.firstReceiptDate == null && epEopInv > 0 || rcInvIn > 0){
             this.firstReceiptDate = SystemDao.getCrc();
         }
         else if(this.firstReceiptDate == null && firstSalesDate != null){
@@ -236,9 +259,6 @@ public class Product {
         this.firstReceiptDate = firstReceiptDate;
     }
 
-    public STATUS_CD getStatusCd() {
-        return statusCd;
-    }
 
     public void updateStatusCode() {
         switch (this.statusCd) {
@@ -259,21 +279,6 @@ public class Product {
         }
     }
 
-    public boolean isBasicItem() {
-        return isBasicItem;
-    }
-
-    public void setIsBasicItem(boolean isBasicItem) {
-        this.isBasicItem = isBasicItem;
-    }
-
-    public Integer getInnerPackQty() {
-        return innerPackQty;
-    }
-
-    public void setInnerPackQty(Integer innerPackQty) {
-        this.innerPackQty = innerPackQty;
-    }
 
     private Sales getSales(LocalDate dt){
         return salesMap.get(Years.years(dt.getYear())) == null ? null : salesMap.get(Years.years(dt.getYear())).get(dt);
@@ -281,6 +286,10 @@ public class Product {
 
     private Demand getDemand(LocalDate dt){
         return demandMap.get(Years.years(dt.getYear())) == null ? null : demandMap.get(Years.years(dt.getYear())).get(dt);
+    }
+
+    private ProductInventory getInventory(LocalDate dt){
+        return inventoryMap.get(Years.years(dt.getYear())) == null ? null : inventoryMap.get(Years.years(dt.getYear())).get(dt);
     }
 
     public void setDisableLearning(Boolean disableLearning) {
@@ -327,7 +336,6 @@ public class Product {
         rcOldAvgDemand = rcAvgSales;
         rcAvgDemandActual = rcAvgSales;
         epAvgInv = rcAvgSales;
-
         rcWass2 = Math.pow(rcAvgSales, 2);
         learningMetricsInitialized = true;
     }
@@ -337,11 +345,9 @@ public class Product {
         if (statusCd != STATUS_CD.LEARNING || disableLearning == true) {
             return;
         }
-        if (onRange && (bopInv > 0 || hasSale == true || invIn > 0)) {
+        if (onRange && (rcBopInv > 0 || hasSale == true || rcInvIn > 0)) {
             initLearningMetrics();
             //Daily learning only applies to RC_AVG_DEMAND and begins immediately when the PL comes on range
-            LocalDate crc = SystemDao.getCrc();
-            Years currYr = Years.years(crc.getYear());
             double lastWeekLift = getDemandUplift(SystemDao.getReviewCycleStartDate());
             double defaultWeight = SystemDao.getDefaultWeight();
             Demand beginOfRunCycleDemand = getDemand(SystemDao.getReviewCycleStartDate());
@@ -351,10 +357,8 @@ public class Product {
             }
 
             if (onRange && !disableLearning) {
-
                 rcAvgDemand = getWeightedWeight1(learningWeekCounter, defaultWeight) * rcDemand / lastWeekLift +
                         (1 - getWeightedWeight1(learningWeekCounter, defaultWeight)) * beginOfRunCycleRcAvgDemand;
-
             }
         }
     }
@@ -367,6 +371,10 @@ public class Product {
         epSales = 0.0;
         epSalesActual = 0;
         epDemand = 0.0;
+        epInvOut = 0;
+        epEopInv = 0;
+        epInvIn = 0;
+        epAvgInv = 0;
     }
 
     //Hook: MSSalesOutlierCheckHook.java
@@ -384,20 +392,17 @@ public class Product {
         else{
             epSales = epSalesActual;
         }
-
     }
 
 
     private double getLostSales(){
+        //lostSales = max(0, average sales - actual sales)
         return Math.max(0, rcAvgDemand/7 - epSalesActual);
     }
 
     /** Outlier filtering has been done prior to processing daily metrics **/
     private void processDailyMetrics(){
-
         LocalDate crc = SystemDao.getCrc();
-
-        //lostSales = max(0, average sales - actual sales)
         double lostSales = getLostSales();
 
         rcSalesActual = rcSalesActual + epSalesActual;
@@ -425,13 +430,10 @@ public class Product {
         /***  Daily Demand Calculations *****/
         //daily demand
         epDemand = getEpDemand();
-
         //demand = sales + lostsales
         //outlier filtered sales used for rcDemand
         rcDemand =  rcSales + lostSales;
-
         rcDemandActual += (epSalesActual + lostSales);
-
 
         Map<LocalDate, Demand> currDemandMap = demandMap.get(yr);
         if(currDemandMap == null){
@@ -444,15 +446,12 @@ public class Product {
         d.setEpDemand(epDemand);
         d.setRcDemand(rcDemand);
         d.setRcDemandActual(rcDemandActual);
-        //d.setRcAvgDemand(rcAvgDemand);
-        //d.setRcAvgDemandActual(rcAvgDemandActual);
-
         currDemandMap.put(crc, d);
         demandMap.put(yr, currDemandMap);
 
         /****** Daily Inventory Calculations *******/
+        processInventory();
 
-        epAvgInv =  Math.max(0, (1 - getWeight1(5) * epAvgInv) + (getWeight1(5)*epEopInv));
         if(epSales > rcMaxSales){
             rcMaxSales = epSales;
             weekSinceMaxSales = 0;
@@ -477,12 +476,18 @@ public class Product {
             currInventoryMap = new TreeMap<LocalDate, ProductInventory>();
         }
         ProductInventory inv = currInventoryMap.get(crc);
-        if(inv == null) {
+        if (inv == null) {
             inv = new ProductInventory();
         }
         inv.setEpAvgInv(epAvgInv);
         inv.setEpEopInv(epEopInv);
-        inv.setBopInv(bopInv);
+        inv.setEpInvOut(epInvOut);
+        inv.setEpInvIn(epInvIn);
+        inv.setRcBopInv(rcBopInv);
+        inv.setRcBopInv(rcBopInv);
+        inv.setRcInvIn(rcInvIn);
+        inv.setRcInvOut(rcInvOut);
+        inv.setInventory(inventory);
 
         currInventoryMap.put(crc, inv);
         inventoryMap.put(yr, currInventoryMap);
@@ -490,29 +495,16 @@ public class Product {
         if(statusCd == STATUS_CD.LEARNING) {
             performDailyLearning();
         }
-
         resetEpAccumulators();
-        updateInventory();
     }
 
-    private void updateInventory(){
-        int minInv = 10;
-        if((invIn - invOut) <= minInv){
-            setBopInv(Vendor.getInventory(invOut));
-            invOut = 0;
-        }
-        else{
-            setBopInv(invIn);
-        }
-        setEpEopInv();
-    }
 
     private void processWeeklyMetrics() {
         //On the end of the review cycle (Sat night) the rcAvgDemand does not undergo weekly learning
         //For this exercise we do not have time granulity  so weekly processing is done Sunday for the prior week
 
         LocalDate crc = SystemDao.getCrc();
-        LocalDate prevCRCStartDate = SystemDao.getPreviousCRCStartDate();
+        LocalDate prevCRCStartDate = SystemDao.getReviewCycleStartDate();//getPreviousCRCStartDate();
         Sales salesData = getSales(crc);
 
         Sales beginOfPeriodSalesData = getSales(prevCRCStartDate);
@@ -566,7 +558,7 @@ public class Product {
         if (hasBeenOffRange) {
             hasBeenOffRange = false;
         }
-        resetWeeklyMatrics();
+        resetRcAccumulators();
     }
 
     private void storeWeeklyMetrics(LocalDate crc){
@@ -600,11 +592,14 @@ public class Product {
         salesMap.put(yr, currSalesMap);
     }
 
-    private void resetWeeklyMatrics(){
+    private void resetRcAccumulators(){
         rcSales = 0;
         rcSalesActual = 0;
         rcDemand = 0;
         rcDemandActual = 0;
+        rcInvIn = 0;
+        rcInvOut = 0;
+        rcBopInv = 0;
     }
 
     public double getWeightedWeight1(long age, double defaultWeight) {
@@ -623,13 +618,6 @@ public class Product {
         return  Math.max(0.2, 1.0 / age);
     }
 
-
-    public Boolean isTempOnHold(LocalDate dt){
-        Years yr = Years.years(dt.getYear());
-        Map<LocalDate, Boolean> map = tempOnHoldMap.get(yr);
-        return map.get(dt);
-    }
-
     public void setTempOnHold(LocalDate dt, Boolean val){
         Years yr = Years.years(dt.getYear());
         Map<LocalDate, Boolean> map = tempOnHoldMap.get(yr);
@@ -640,18 +628,13 @@ public class Product {
         tempOnHoldMap.put(yr, map);
     }
 
-    public Integer getEpEopInv() {
-        return epEopInv;
-    }
-
-    public void setEpEopInv() {
+    public void updateEpEopInv() {
         if(syncInventory){
-            this.epEopInv = Vendor.getInventory(bopInv);
+            this.epEopInv = inventory;
         }
-        else if(invIn != 0 || invOut != 0){
-            epEopInv = epEopInv + invIn - invOut;
+        else if(epInvIn != 0 || epInvOut != 0){
+            epEopInv = (epEopInv + epInvIn) - epInvOut;
         }
-
     }
 
     public void addEvent(LocalDate dt, Event e){
@@ -671,22 +654,25 @@ public class Product {
     }
 
     public String toString(){
-        return new StringBuffer().append(salesToString()).append(demandToString()).toString();
+        return new StringBuffer().append(salesToString()).append(demandToString()).append(inventoryToString()).toString();
     }
 
     private String salesToString(){
         StringBuffer epSalesActualBf = new StringBuffer();
         epSalesActualBf.append("epSalesActual|");
+
         StringBuffer epSalesBf = new StringBuffer();
         epSalesBf.append("epSales|");
 
         StringBuffer rcSalesBf = new StringBuffer();
         rcSalesBf.append("rcSales|");
+
         StringBuffer rcAvgSalesBf = new StringBuffer();
         rcAvgSalesBf.append("rcAvgSales|");
 
         StringBuffer rcSalesActualBf = new StringBuffer();
         rcSalesActualBf.append("rcSalesActual|");
+
         StringBuffer rcAvgSalesActualBf = new StringBuffer();
         rcAvgSalesActualBf.append("rcAvgSalesActual|");
 
@@ -733,7 +719,6 @@ public class Product {
                 rcAvgSalesBf.append(":");
                 rcAvgSalesBf.append(currSale.getRcAvgSales());
                 rcAvgSalesBf.append("|");
-
             }
         }
         epSalesActualBf.append(";\n");
@@ -764,15 +749,18 @@ public class Product {
 
         StringBuffer epDemandBf = new StringBuffer();
         epDemandBf.append("epDemand|");
+
         StringBuffer rcActualDemandBf = new StringBuffer();
         rcActualDemandBf.append("rcActualDemand|");
+
         StringBuffer rcDemandBf = new StringBuffer();
         rcDemandBf.append("rcDemand|");
+
         StringBuffer rcAvgDemandBf = new StringBuffer();
         rcAvgDemandBf.append("rcAvgDemand|");
+
         StringBuffer rcAvgDemandActualBf = new StringBuffer();
         rcAvgDemandActualBf.append("rcAvgDemandActual|");
-
 
         while(yrItr.hasNext()){
             currYr = yrItr.next();
@@ -824,68 +812,109 @@ public class Product {
 
         return retBf.toString();
     }
-/*
+
     private String inventoryToString(){
-        StringBuffer bopBf = new StringBuffer();
-        bopBf.append("bopInv|");
-        StringBuffer invInBf = new StringBuffer();
-        invInBf.append("invIn|");
-        StringBuffer epAvgInvInBf = new StringBuffer();
-        epAvgInvInBf.append("epAvgInvIn|");
-        StringBuffer invOutBf = new StringBuffer();
-        invOutBf.append("invOut|");
+        StringBuffer epAvgInvBf = new StringBuffer();
+        epAvgInvBf.append("epAvgInv|");
+
         StringBuffer epEopInvBf = new StringBuffer();
         epEopInvBf.append("epEopInv|");
 
-        Iterator<Years> yrItr = salesMap.keySet().iterator();
-        Map<LocalDate, Sales> currSalesMap;
+        StringBuffer epInvOutBf = new StringBuffer();
+        epInvOutBf.append("epInvOut|");
+
+        StringBuffer epInvInBf = new StringBuffer();
+        epInvInBf.append("epInvIn|");
+
+        StringBuffer rcBopInvBf = new StringBuffer();
+        rcBopInvBf.append("rcBopInv|");
+
+        StringBuffer rcInvInBf = new StringBuffer();
+        rcInvInBf.append("rcInvIn|");
+
+        StringBuffer rcInvOutBf = new StringBuffer();
+        rcInvOutBf.append("rcInvOut|");
+
+        StringBuffer actualInvBf = new StringBuffer();
+        actualInvBf.append("actualInv|");
+
+        Iterator<Years> yrItr = inventoryMap.keySet().iterator();
+        Map<LocalDate, ProductInventory> currInvMap;
         LocalDate currDate;
         Years currYr;
-        Sales currSale;
+        ProductInventory currInv;
         //Populate Sale buffers
         while(yrItr.hasNext()){
             currYr = yrItr.next();
-            currSalesMap = salesMap.get(currYr);
-            Iterator<LocalDate> itr = currSalesMap.keySet().iterator();
+            currInvMap = inventoryMap.get(currYr);
+            Iterator<LocalDate> itr = currInvMap.keySet().iterator();
             while(itr.hasNext()){
                 currDate = itr.next();
-                currSale = currSalesMap.get(currDate);
-                //rc sales actual
-                rcSalesActualBf.append(currDate);
-                rcSalesActualBf.append(":");
-                rcSalesActualBf.append(currSale.getRcSalesActual());
-                rcSalesActualBf.append("|");
-                //rc average sales actual
-                rcAvgSalesActualBf.append(currDate);
-                rcAvgSalesActualBf.append(":");
-                rcAvgSalesActualBf.append(currSale.getRcAvgSalesActual());
-                rcAvgSalesActualBf.append("|");
-                //rc sales
-                rcSalesBf.append(currDate);
-                rcSalesBf.append(":");
-                rcSalesBf.append(currSale.getRcSales());
-                rcSalesBf.append("|");
-                //rc sales average
-                rcAvgSalesBf.append(currDate);
-                rcAvgSalesBf.append(":");
-                rcAvgSalesBf.append(currSale.getRcAvgSales());
-                rcAvgSalesBf.append("|");
+                currInv = currInvMap.get(currDate);
+                //epAvgInv
+                epAvgInvBf.append(currDate);
+                epAvgInvBf.append(":");
+                epAvgInvBf.append(currInv.getEpAvgInv());
+                epAvgInvBf.append("|");
+                //epEopInv
+                epEopInvBf.append(currDate);
+                epEopInvBf.append(":");
+                epEopInvBf.append(currInv.getEpEopInv());
+                epEopInvBf.append("|");
+                //epInvOut
+                epInvOutBf.append(currDate);
+                epInvOutBf.append(":");
+                epInvOutBf.append(currInv.getEpInvOut());
+                epInvOutBf.append("|");
+                //epInvIn
+                epInvInBf.append(currDate);
+                epInvInBf.append(":");
+                epInvInBf.append(currInv.getEpInvIn());
+                epInvInBf.append("|");
 
+                //rcBopInv
+                rcBopInvBf.append(currDate);
+                rcBopInvBf.append(":");
+                rcBopInvBf.append(currInv.getRcBopInv());
+                rcBopInvBf.append("|");
+                //rcInvInBf
+                rcInvInBf.append(currDate);
+                rcInvInBf.append(":");
+                rcInvInBf.append(currInv.getRcInvIn());
+                rcInvInBf.append("|");
+                //rcInvOut
+                rcInvOutBf.append(currDate);
+                rcInvOutBf.append(":");
+                rcInvOutBf.append(currInv.getRcInvOut());
+                rcInvOutBf.append("|");
+                //ActualInv
+                actualInvBf.append(currDate);
+                actualInvBf.append(":");
+                actualInvBf.append(currInv.getInventory());
+                actualInvBf.append("|");
             }
         }
-        rcSalesActualBf.append(";\n");
-        rcAvgSalesActualBf.append(";\n");
-        rcSalesBf.append(";\n");
-        rcAvgSalesBf.append(";\n");
+        epAvgInvBf.append(";\n");
+        epEopInvBf.append(";\n");
+        epInvOutBf.append(";\n");
+        epInvInBf.append(";\n");
+        actualInvBf.append(";\n");
+
+        rcBopInvBf.append(";\n");
+        rcInvInBf.append(";\n");
+        rcInvOutBf.append(";\n");
 
         StringBuffer retBf = new StringBuffer();
-        retBf.append(rcSalesActualBf.toString());
-        retBf.append(rcAvgSalesActualBf.toString());
-        retBf.append(rcSalesBf.toString());
-        retBf.append(rcAvgSalesBf.toString());
+        retBf.append(epAvgInvBf.toString());
+        retBf.append(epEopInvBf.toString());
+        retBf.append(epInvOutBf.toString());
+        retBf.append(epInvInBf.toString());
+        retBf.append(actualInvBf.toString());
+        retBf.append(rcBopInvBf.toString());
+        retBf.append(rcInvInBf.toString());
+        retBf.append(rcInvOutBf.toString());
         retBf.append("\n");
 
         return retBf.toString();
     }
-    */
 }

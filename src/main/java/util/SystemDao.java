@@ -18,6 +18,7 @@ public class SystemDao {
     //These values were obtained from qlauncher.properties
     private static int specialPurchaseOrderWassMultiplier = 3;
     private static int specialPurchaseOrderSizeMultipler = 2;
+    private static double weight_5 = 0.3;
 
 
 
@@ -73,11 +74,12 @@ public class SystemDao {
 
     public static LocalDate getReviewCycleStartDate(){
         int weekday = DateTimeConstants.SUNDAY;
-        LocalDate retVal = (crc.getDayOfWeek() < weekday)?crc.minusDays(crc.getDayOfWeek()):crc;
+        LocalDate retVal;
+        retVal =  (crc.getDayOfWeek() < weekday) ? crc.minusDays(crc.getDayOfWeek()) : crc.minusWeeks(1);
         return retVal;
     }
 
-    public static LocalDate getPreviousCRCStartDate(){
+    private static LocalDate getPreviousCRCStartDate(){
         int weekday = DateTimeConstants.SUNDAY;
         LocalDate previousReviewCycle = crc.minusWeeks(1);
         LocalDate retVal = (previousReviewCycle.getDayOfWeek() < weekday)?previousReviewCycle.minusDays(previousReviewCycle.getDayOfWeek()):previousReviewCycle;
@@ -91,5 +93,9 @@ public class SystemDao {
 
     public static int getSpecialPurchaseOrderSizeMultipler() {
         return specialPurchaseOrderSizeMultipler;
+    }
+
+    public static double getWeight_5() {
+        return weight_5;
     }
 }

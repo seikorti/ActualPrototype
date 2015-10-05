@@ -53,8 +53,10 @@ import java.util.*;
 public class ActualPrototype {
     List<ProcessingHook> processingHooks = new LinkedList<ProcessingHook>();
     Collection<Location> locations =  LocationDao.getInstance().getLocations();
+    Random rand;
 
     public ActualPrototype(){
+        rand = new Random(50); //Seeding here generates the same random number for repeatability
         LocalDate crc = new LocalDate().withYear(2013).withMonthOfYear(1).withDayOfMonth(6);
         SystemDao.setCrc(crc);
         processingHooks.add(new PreProcessingHook());
@@ -73,11 +75,12 @@ public class ActualPrototype {
 
         actualPrototype.setup();
 
-        Random randGen = new Random();
+        //Random rand = new Random();
         LocalDate strtDt = SystemDao.getCrc();
         LocalDate endDt = SystemDao.getCrc().plusWeeks(16);
         Location loc1;
         Product product = null;
+        int numberSold = 0;
 
         while(!strtDt.isAfter(endDt)){
             strtDt = strtDt.plusDays(1);
@@ -85,8 +88,10 @@ public class ActualPrototype {
             product = loc1.getProduct("prod1");
 
             //perform a sale at this location
-            int numberSold = randGen.nextInt(100);
+            //int numberSold = randGen.nextInt(100);
+            numberSold = actualPrototype.randInt(0, 100);
             loc1.processSale(product, numberSold);
+            //System.out.println(numberSold);
 
             //now that the day is over run actual
             actualPrototype.runActual();
@@ -95,7 +100,6 @@ public class ActualPrototype {
         }
         System.out.println(product.toString());
         actualPrototype.saveData(new StringBuffer().append(product.toString()));
-
     }
 
     protected void runActual(){
@@ -114,12 +118,21 @@ public class ActualPrototype {
         p1.setStoreOpenDate(crc);
         p1.setNumberOfDaysToBecomeActive(1);
         p1.setDisableLearning(false);
-        p1.setBopInv(1000);
+        p1.setInventory(1000);
         p1.setOnRange(true);
 
         Location loc1 = LocationDao.getInstance().getLocation("loc1");
         loc1.addProduct(p1);
         //SystemDao.addLocation(loc1);
+    }
+
+    public int randInt(int min, int max) {
+
+        // nextInt is normally exclusive of the top value,
+        // so add 1 to make it inclusive
+        int randomNum = rand.nextInt((max - min) + 1) + min;
+
+        return randomNum;
     }
 
 

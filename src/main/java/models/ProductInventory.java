@@ -7,7 +7,15 @@ public class ProductInventory {
     double inStockPct;
     double epAvgInv;
     double epEopInv;
-    double bopInv;
+    int epInvOut;
+    int epInvIn;
+
+    int rcInvIn;
+    int rcInvOut;
+    double rcBopInv;
+
+    int inventory;
+
 
     public double getInStockPct() {
         return inStockPct;
@@ -33,11 +41,51 @@ public class ProductInventory {
         this.epEopInv = epEopInv;
     }
 
-    public double getBopInv() {
-        return bopInv;
+    public double getRcBopInv() {
+        return rcBopInv;
     }
 
-    public void setBopInv(double bopInv) {
-        this.bopInv = bopInv;
+    public void setRcBopInv(double rcBopInv) {
+        this.rcBopInv = rcBopInv;
+    }
+
+    public int getEpInvOut() {
+        return epInvOut;
+    }
+
+    public void setEpInvOut(int epInvOut) {
+        this.epInvOut = epInvOut;
+    }
+
+    public int getEpInvIn() {
+        return epInvIn;
+    }
+
+    public void setEpInvIn(int epInvIn) {
+        this.epInvIn = epInvIn;
+    }
+
+    public int getRcInvIn() {
+        return rcInvIn;
+    }
+
+    public void setRcInvIn(int rcInvIn) {
+        this.rcInvIn = rcInvIn;
+    }
+
+    public int getRcInvOut() {
+        return rcInvOut;
+    }
+
+    public void setRcInvOut(int rcInvOut) {
+        this.rcInvOut = rcInvOut;
+    }
+
+    public int getInventory() {
+        return inventory;
+    }
+
+    public void setInventory(int inventory) {
+        this.inventory = inventory;
     }
 }
